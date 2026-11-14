@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CartService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">com.hirfa.service</a> &gt; <span class="el_source">CartService.java</span></div><h1>CartService.java</h1><pre class="source lang-java linenums">package com.hirfa.service;
+
+import com.hirfa.model.Cart;
+import com.hirfa.model.Outcome;
+import com.hirfa.model.Product;
+import com.hirfa.repo.Repo;
+
+public class CartService {
+    public static final int MAX_QTY_PER_PRODUCT = 5;
+    private final Repo repo;
+
+<span class="fc" id="L12">    public CartService(Repo repo) {</span>
+<span class="fc" id="L13">        this.repo = repo;</span>
+<span class="fc" id="L14">    }</span>
+
+    public Outcome addItem(Cart cart, int productId, int qty) {
+<span class="fc" id="L17">        Product p = repo.product(productId);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (p == null) return Outcome.fail(&quot;المنتج غير موجود&quot;);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (qty &lt; 1) return Outcome.fail(&quot;الكمية يجب أن تكون رقماً موجباً&quot;);</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (qty &gt; MAX_QTY_PER_PRODUCT) return Outcome.fail(&quot;الحد الأقصى 5 قطع من كل منتج في السلة&quot;);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (qty &gt; p.stock) return Outcome.fail(&quot;الكمية المطلوبة غير متوفرة حالياً&quot;);</span>
+<span class="fc" id="L22">        cart.put(productId, qty);</span>
+<span class="fc" id="L23">        return Outcome.ok(&quot;تمت إضافة &quot; + p.name + &quot; x&quot; + qty + &quot; إلى السلة&quot;);</span>
+    }
+
+    public Outcome changeQty(Cart cart, int productId, int newQty) {
+<span class="fc" id="L27">        Product p = repo.product(productId);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (p == null) return Outcome.fail(&quot;المنتج غير موجود&quot;);</span>
+<span class="fc bfc" id="L29" title="All 4 branches covered.">        if (newQty &lt; 1 || newQty &gt; MAX_QTY_PER_PRODUCT) return Outcome.fail(&quot;الكمية المسموحة من 1 إلى 5&quot;);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (newQty &gt; p.stock) return Outcome.fail(&quot;الكمية المطلوبة غير متوفرة حالياً&quot;);</span>
+<span class="fc" id="L31">        cart.set(productId, newQty);</span>
+<span class="fc" id="L32">        return Outcome.ok(&quot;صارت كمية &quot; + p.name + &quot; في السلة &quot; + newQty);</span>
+    }
+
+    public double total(Cart cart) {
+<span class="fc" id="L36">        double t = 0;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (var entry : cart.all().entrySet()) {</span>
+<span class="fc" id="L38">            Product p = repo.product(entry.getKey());</span>
+<span class="fc" id="L39">            t += p.price * entry.getValue();</span>
+<span class="fc" id="L40">        }</span>
+<span class="fc" id="L41">        return Math.round(t * 100.0) / 100.0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

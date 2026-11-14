@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">com.hirfa.service</a> &gt; <span class="el_source">ProductService.java</span></div><h1>ProductService.java</h1><pre class="source lang-java linenums">package com.hirfa.service;
+
+import com.hirfa.model.Outcome;
+import com.hirfa.model.Product;
+import com.hirfa.repo.Repo;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ProductService {
+    public static final double MAX_PRICE = 1000;
+    public static final int MAX_STOCK = 500;
+    private final Repo repo;
+<span class="fc" id="L13">    private final ValidationService validation = new ValidationService();</span>
+
+<span class="fc" id="L15">    public ProductService(Repo repo) {</span>
+<span class="fc" id="L16">        this.repo = repo;</span>
+<span class="fc" id="L17">    }</span>
+
+    public Outcome add(int artisanId, String name, String craft, double price, int stock) {
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (!validation.validName(name)) return Outcome.fail(&quot;اسم المنتج مطلوب&quot;);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (!validation.validCraft(craft)) return Outcome.fail(&quot;الفئة غير معتمدة&quot;);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (price &lt;= 0) return Outcome.fail(&quot;السعر يجب أن يكون أكبر من صفر&quot;);</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (price &gt; MAX_PRICE) return Outcome.fail(&quot;السعر يتجاوز الحد الأقصى 1000 دينار&quot;);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (stock &lt; 0) return Outcome.fail(&quot;المخزون لا يمكن أن يكون سالباً&quot;);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (stock &gt; MAX_STOCK) return Outcome.fail(&quot;المخزون يتجاوز الحد الأقصى 500 قطعة&quot;);</span>
+<span class="fc" id="L26">        int id = repo.insertProduct(new Product(0, artisanId, name.trim(), craft, price, stock));</span>
+<span class="fc" id="L27">        return new Outcome(true, &quot;تم إضافة المنتج &quot; + name.trim() + &quot; بسعر &quot; + price + &quot; دينار&quot;, id);</span>
+    }
+
+    public Outcome restock(int productId, int amount) {
+<span class="fc" id="L31">        Product p = repo.product(productId);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (p == null) return Outcome.fail(&quot;المنتج غير موجود&quot;);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (amount &lt;= 0) return Outcome.fail(&quot;الكمية غير صحيحة&quot;);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (p.stock + amount &gt; MAX_STOCK) return Outcome.fail(&quot;المخزون يتجاوز الحد الأقصى 500 قطعة&quot;);</span>
+<span class="fc" id="L35">        p.stock += amount;</span>
+<span class="fc" id="L36">        repo.saveProduct(p);</span>
+<span class="fc" id="L37">        return new Outcome(true, &quot;تم إعادة التخزين، الكمية الحالية &quot; + p.stock, p.stock);</span>
+    }
+
+    public List&lt;Product&gt; search(String craft, Double maxPrice) {
+<span class="fc" id="L41">        List&lt;Product&gt; out = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (Product p : repo.products()) {</span>
+<span class="fc bfc" id="L43" title="All 6 branches covered.">            if (craft != null &amp;&amp; !craft.isBlank() &amp;&amp; !p.craft.equals(craft)) continue;</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">            if (maxPrice != null &amp;&amp; p.price &gt; maxPrice) continue;</span>
+<span class="fc" id="L45">            out.add(p);</span>
+<span class="fc" id="L46">        }</span>
+<span class="fc" id="L47">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

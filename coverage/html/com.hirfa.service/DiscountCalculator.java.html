@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscountCalculator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">com.hirfa.service</a> &gt; <span class="el_source">DiscountCalculator.java</span></div><h1>DiscountCalculator.java</h1><pre class="source lang-java linenums">package com.hirfa.service;
+
+import com.hirfa.model.Outcome;
+
+<span class="fc" id="L5">public class DiscountCalculator {</span>
+
+    public Outcome apply(String code, double subtotal) {
+<span class="fc bfc" id="L8" title="All 4 branches covered.">        if (code == null || code.isBlank()) return Outcome.ok(&quot;بدون كود خصم&quot;, 0);</span>
+<span class="fc bfc" id="L9" title="All 3 branches covered.">        switch (code.trim()) {</span>
+            case &quot;حرفة10&quot; -&gt; {
+<span class="fc bfc" id="L11" title="All 2 branches covered.">                if (subtotal &lt; 10) return Outcome.fail(&quot;الكود حرفة10 متاح للطلبات من 10 دنانير&quot;);</span>
+<span class="fc" id="L12">                return Outcome.ok(&quot;تم تطبيق خصم 10%&quot;, round(subtotal * 0.10));</span>
+            }
+            case &quot;طلاب5&quot; -&gt; {
+<span class="fc" id="L15">                return Outcome.ok(&quot;تم تطبيق خصم 5%&quot;, round(subtotal * 0.05));</span>
+            }
+            default -&gt; {
+<span class="fc" id="L18">                return Outcome.fail(&quot;الكود &quot; + code.trim() + &quot; غير معتمد&quot;);</span>
+            }
+        }
+    }
+
+    private double round(double v) {
+<span class="fc" id="L24">        return Math.round(v * 100.0) / 100.0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

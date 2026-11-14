@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomerService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">com.hirfa.service</a> &gt; <span class="el_source">CustomerService.java</span></div><h1>CustomerService.java</h1><pre class="source lang-java linenums">package com.hirfa.service;
+
+import com.hirfa.model.Customer;
+import com.hirfa.model.Outcome;
+import com.hirfa.repo.Repo;
+
+public class CustomerService {
+    public static final double MIN_PASSWORD_LENGTH = 8;
+    private final Repo repo;
+    private final ValidationService validation;
+
+<span class="fc" id="L12">    public CustomerService(Repo repo) {</span>
+<span class="fc" id="L13">        this.repo = repo;</span>
+<span class="fc" id="L14">        this.validation = new ValidationService();</span>
+<span class="fc" id="L15">    }</span>
+
+    public Outcome register(String name, String phone, String email, String password) {
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (!validation.validName(name)) return Outcome.fail(&quot;الاسم مطلوب&quot;);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (!validation.validPhone(phone)) return Outcome.fail(&quot;رقم الهاتف غير صحيح، مثال: 0791234567&quot;);</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (!validation.validEmail(email)) return Outcome.fail(&quot;البريد الإلكتروني غير صحيح&quot;);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (!validation.validPassword(password)) return Outcome.fail(&quot;كلمة المرور ضعيفة: 8 خانات على الأقل مع أحرف وأرقام&quot;);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (repo.customerByEmail(email) != null) return Outcome.fail(&quot;البريد الإلكتروني مسجل مسبقاً&quot;);</span>
+<span class="fc" id="L23">        int id = repo.insertCustomer(new Customer(0, name.trim(), phone, email, password, 0, 0));</span>
+<span class="fc" id="L24">        return new Outcome(true, &quot;مرحباً &quot; + name.trim() + &quot;، تم إنشاء حسابك بنجاح&quot;, id);</span>
+    }
+
+    public Outcome login(String email, String password) {
+<span class="fc" id="L28">        Customer c = repo.customerByEmail(email);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (c == null) return Outcome.fail(&quot;البريد الإلكتروني غير مسجل&quot;);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (!c.password.equals(password)) return Outcome.fail(&quot;كلمة المرور غير صحيحة&quot;);</span>
+<span class="fc" id="L31">        return Outcome.ok(&quot;مرحباً بك مجدداً، &quot; + c.name, c.id);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

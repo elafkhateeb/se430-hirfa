@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">com.hirfa.service</a> &gt; <span class="el_source">ValidationService.java</span></div><h1>ValidationService.java</h1><pre class="source lang-java linenums">package com.hirfa.service;
+
+import java.util.List;
+
+<span class="fc" id="L5">public class ValidationService {</span>
+    public boolean validName(String name) {
+<span class="fc bfc" id="L7" title="All 4 branches covered.">        return name != null &amp;&amp; !name.isBlank();</span>
+    }
+
+    public boolean validPhone(String phone) {
+<span class="fc bfc" id="L11" title="All 4 branches covered.">        return phone != null &amp;&amp; phone.matches(&quot;07[789]\\d{7}&quot;);</span>
+    }
+
+    public boolean validEmail(String email) {
+<span class="fc bfc" id="L15" title="All 4 branches covered.">        return email != null &amp;&amp; email.matches(&quot;[^@\\s]+@[^@\\s]+\\.[a-zA-Z]{2,}&quot;);</span>
+    }
+
+    public boolean validPassword(String password) {
+<span class="fc bfc" id="L19" title="All 4 branches covered.">        return password != null &amp;&amp; password.length() &gt;= 8</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">                &amp;&amp; password.matches(&quot;.*[a-zA-Z\\u0600-\\u06FF].*&quot;)</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">                &amp;&amp; password.matches(&quot;.*\\d.*&quot;);</span>
+    }
+
+    public boolean validCraft(String craft) {
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (craft == null) return false;</span>
+<span class="fc" id="L26">        return List.of(&quot;تطريز&quot;, &quot;صابون&quot;, &quot;خشبيات&quot;, &quot;جلوديات&quot;, &quot;سيراميك&quot;, &quot;مجوهرات&quot;).contains(craft);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
