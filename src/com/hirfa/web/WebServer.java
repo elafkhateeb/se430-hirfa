@@ -46,7 +46,8 @@ public class WebServer {
     private void route(com.sun.net.httpserver.HttpExchange ex) throws IOException {
         String path = ex.getRequestURI().getPath();
         String body = ex.getRequestMethod().equals("POST") ? new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8) : "";
-        var params = parseForm(body.isEmpty() ? ex.getRequestURI().getRawQuery() : body);
+        String query = body.isEmpty() ? ex.getRequestURI().getRawQuery() : body;
+        var params = parseForm(query == null ? "" : query);
         String page;
         switch (path) {
             case "/", "/products" -> page = productsPage(params.get("craft"), params.get("max"));
