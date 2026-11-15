@@ -48,9 +48,10 @@ public class WebServer {
         String body = ex.getRequestMethod().equals("POST") ? new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8) : "";
         String query = body.isEmpty() ? ex.getRequestURI().getRawQuery() : body;
         var params = parseForm(query == null ? "" : query);
+        currentPath = path.equals("/") ? "/products" : path;
         String page;
         switch (path) {
-            case "/", "/products" -> page = productsPage(params.get("craft"), params.get("max"));
+            case "/", "/products" -> page = productsPage(params.get("craft"), params.get("max"), path);
             case "/register" -> page = ex.getRequestMethod().equals("POST")
                     ? doRegister(params) : formPage();
             case "/login" -> page = ex.getRequestMethod().equals("POST") ? doLogin(params) : loginPage("");
@@ -70,29 +71,111 @@ public class WebServer {
         }
     }
 
-    private String productsPage(String craft, String max) {
+    private static final String CSS = """
+            *{box-sizing:border-box}
+            body{margin:0;background:#faf7f1;color:#33291c;font-family:'Segoe UI',Tahoma,sans-serif;line-height:1.6}
+            header{background:#5d4116;color:#f5ecd9;padding:14px 20px 0}
+            .head{max-width:980px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+            .brand{font-size:1.3rem;font-weight:700;letter-spacing:.5px}
+            nav{display:flex;flex-wrap:wrap;gap:4px;padding-bottom:8px}
+            nav a{color:#e8d9bb;text-decoration:none;padding:6px 12px;border-radius:8px;font-size:.92rem}
+            nav a:hover{background:rgba(255,255,255,.14)}
+            nav a.active{background:#8a5a00;color:#fff}
+            main{max-width:980px;margin:0 auto;padding:24px 16px 50px}
+            h2{color:#5d4116;margin:0 0 4px;font-size:1.4rem}
+            .sub{color:#8a7a63;font-size:.93rem;margin:0 0 18px}
+            .card{background:#fff;border:1px solid #e4d8c2;border-radius:12px;padding:18px;margin-bottom:18px}
+            .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+            label{display:block;font-size:.85rem;color:#8a7a63;font-weight:600;margin-bottom:4px}
+            input,select{font:inherit;padding:8px 10px;border:1px solid #d3c5a8;border-radius:8px;background:#fff;color:#33291c}
+            input:focus,select:focus{outline:2px solid #c9a24b}
+            button{font:inherit;font-weight:700;padding:9px 16px;border:0;border-radius:8px;cursor:pointer;background:#8a5a00;color:#fff}
+            button:hover{background:#6b3f00}
+            button:disabled{background:#b9a98c;cursor:not-allowed}
+            a.btn{display:inline-block;background:#fff;border:1px solid #8a5a00;color:#5d4116;
+                  padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.92rem}
+            a.btn:hover{background:#f7efe0}
+            .ok{background:#e6f4ea;color:#0a7d32;border:1px solid #bfe4c8;padding:10px 14px;border-radius:8px;margin:0 0 16px;font-weight:600}
+            .err{background:#fdecea;color:#b3261e;border:1px solid #f0c4bf;padding:10px 14px;border-radius:8px;margin:0 0 16px;font-weight:600}
+            .hint{background:#f6efe1;border:1px dashed #d3c5a8;color:#8a7a63;border-radius:8px;padding:10px 14px;font-size:.9rem}
+            .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+            .product{display:flex;flex-direction:column;gap:8px}
+            .product h3{margin:0;font-size:1.05rem}
+            .tag{display:inline-block;background:#e9f2ec;color:#125e38;border-radius:99px;padding:2px 10px;font-size:.78rem}
+            .stock{color:#8a7a63;font-size:.85rem}
+            .stock.out{color:#b3261e;font-weight:600}
+            .price{font-weight:700;color:#125e38;font-size:1.15rem}
+            .buy{display:flex;gap:8px;align-items:center;margin-top:auto;padding-top:6px;border-top:1px solid #f0e6d2}
+            .buy input{width:56px}
+            .table-wrap{overflow-x:auto}
+            table{border-collapse:collapse;width:100%;background:#fff}
+            th,td{padding:9px 12px;text-align:right;border-bottom:1px solid #eee2cc}
+            th{background:#f4ead7;color:#5d4116;font-size:.88rem}
+            .total{font-weight:700;background:#faf3e4}
+            .balance{font-size:2rem;font-weight:800;color:#125e38;text-align:center;margin:8px 0 4px}
+            .center{text-align:center;padding:42px 18px}
+            footer{max-width:980px;margin:0 auto;padding:0 16px 26px;color:#8a7a63;font-size:.84rem;text-align:center}
+            @media(max-width:640px){.head{flex-direction:column;align-items:center}nav{justify-content:center}}
+            """;
+
+    private String currentPath = "/";
+
+    private String header(String title) {
+        String[][] links = {{"المنتجات", "/products"}, {"تسجيل", "/register"}, {"دخول", "/login"},
+                {"السلّة", "/cart"}, {"إتمام الطلب", "/order"}, {"المحفظة", "/wallet"}, {"تقارير", "/admin"}};
+        StringBuilder nav = new StringBuilder();
+        for (String[] l : links)
+            nav.append("<a href='%s'%s>%s</a>".formatted(l[1],
+                    (l[1].equals("/") || currentPath.equals(l[1])) ? " class='active'" : "", l[0]));
+        return """
+                <!DOCTYPE html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>
+                <meta name='viewport' content='width=device-width, initial-scale=1'>
+                <title>حِرفة — %s</title>
+                <style>%s</style></head><body>
+                <header><div class='head'><div class='brand'>حِرفة</div><nav>%s</nav></div></header>
+                <main><h2>%s</h2>
+                """.formatted(title, CSS, nav, title);
+    }
+
+    private String footer() {
+        return "</main><footer>حِرفة — منصة توصيل الأعمال اليدوية · SE430 Software Testing Project 2026</footer></body></html>";
+    }
+
+    private String productsPage(String craft, String max, String path) {
         Double maxPrice = (max == null || max.isBlank()) ? null : Double.valueOf(max);
         List<Product> list = productService.search(craft, maxPrice);
         StringBuilder sb = new StringBuilder();
         sb.append(header("المنتجات"));
+        sb.append("<p class='sub'>تصفح أعمال الحرفيين الأردنيين</p>");
         sb.append("""
-                <form method='get' action='/products'>
-                الفئة: <input name='craft' value='%s'> أقصى سعر: <input name='max' size='5' value='%s'>
-                <button>بحث</button> (<a href='/products'>الكل</a>)</form>
-                <a href='/register'>تسجيل جديد</a> | <a href='/login'>دخول</a> | <a href='/cart'>السلة</a> | <a href='/order'>طلب سريع</a> | <a href='/wallet'>المحفظة</a> | <a href='/admin'>تقارير الحرفيين</a>
-                <table><tr><th>المنتج</th><th>الفئة</th><th>الحرفي</th><th>السعر</th><th>المخزون</th><th></th></tr>
+                <div class='card'><form method='get' action='/products' class='row'>
+                <div><label>الفئة</label><input name='craft' value='%s' placeholder='صابون'></div>
+                <div><label>أقصى سعر (دينار)</label><input name='max' value='%s' size='6'></div>
+                <button>بحث</button> <a class='btn' href='/products'>الكل</a>
+                </form></div>
                 """.formatted(craft == null ? "" : craft, max == null ? "" : max));
-        for (Product p : list) {
-            sb.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%.2f دينار</td><td>%d</td>"
-                    .formatted(p.name, p.craft, repo.artisan(p.artisanId).name, p.price, p.stock));
-            sb.append("""
-                    <td><form method='post' action='/cart'>
-                    <input type='hidden' name='productId' value='%d'> الكمية: <input name='qty' size='2' value='1'>
-                    <button>أضف للسلة</button></form></td></tr>
-                    """.formatted(p.id));
+        if (list.isEmpty()) sb.append("<div class='card center'>لا توجد منتجات مطابقة للبحث</div>");
+        else {
+            sb.append("<div class='grid'>");
+            for (Product p : list) {
+                String stock = p.stock <= 0 ? "<span class='stock out'>غير متوفر حالياً</span>"
+                        : "<span class='stock'>متوفر: " + p.stock + " قطعة</span>";
+                sb.append("""
+                        <div class='card product'>
+                        <h3>%s</h3>
+                        <span class='tag'>%s</span> <span>حرفي: %s</span>
+                        <div><span class='price'>%.2f دينار</span> — %s</div>
+                        <form method='post' action='/cart' class='buy'>
+                        <input type='hidden' name='productId' value='%d'>
+                        <label style='margin:0'>الكمية</label><input name='qty' value='1'>
+                        <button %s>أضف للسلة</button>
+                        </form></div>
+                        """.formatted(p.name, p.craft, repo.artisan(p.artisanId).name, p.price, stock,
+                        p.id, p.stock <= 0 ? "disabled" : ""));
+            }
+            sb.append("</div>");
         }
-        sb.append("</table>").append(footer());
-        return sb.toString();
+        return sb.toString() + footer();
     }
 
     private String doRegister(LinkedHashMap<String, String> params) {
@@ -101,12 +184,12 @@ public class WebServer {
         Outcome out = role.equals("artisan")
                 ? artisanService.register(name, params.get("phone"), params.get("craft"))
                 : customerService.register(name, params.get("phone"), params.get("email"), params.get("password"));
+        if (out.ok() && role.equals("customer")) signedIn = repo.customer((int) out.value());
         StringBuilder sb = new StringBuilder();
         sb.append(header("التسجيل"));
         sb.append("<p class='%s'>%s</p>".formatted(out.ok() ? "ok" : "err", out.message()));
-        if (out.ok() && role.equals("customer")) signedIn = repo.customer((int) out.value());
-        sb.append("<a href='/register'>رجوع</a>").append(footer());
-        return sb.toString();
+        sb.append("<a class='btn' href='/products'>ابدأ التسوق</a>");
+        return sb.toString() + footer();
     }
 
     private String doLogin(LinkedHashMap<String, String> params) {
@@ -115,8 +198,9 @@ public class WebServer {
         StringBuilder sb = new StringBuilder();
         sb.append(header("الدخول"));
         sb.append("<p class='%s'>%s</p>".formatted(out.ok() ? "ok" : "err", out.message()));
-        sb.append("<a href='/login'>حاول مرة أخرى</a>").append(footer());
-        return sb.toString();
+        sb.append("<div class='row'><a class='btn' href='/products'>المنتجات</a>"
+                + "<a class='btn' href='/login'>حاول مرة أخرى</a></div>");
+        return sb.toString() + footer();
     }
 
     private String doCart(LinkedHashMap<String, String> params) {
@@ -126,27 +210,40 @@ public class WebServer {
 
     private String cartPage(String message) {
         StringBuilder sb = new StringBuilder();
-        sb.append(header("السلة"));
-        if (message != null && !message.isBlank()) sb.append("<p>%s</p>".formatted(message));
-        sb.append("""
-                <p>الحساب الحالي: %s</p>
-                <table><tr><th>المنتج</th><th>الكمية</th></tr>
-                """.formatted(signedIn == null ? "زائر" : signedIn.name));
-        for (var entry : demoCart.all().entrySet()) {
-            Product p = repo.product(entry.getKey());
-            sb.append("<tr><td>%s</td><td>%d</td></tr>".formatted(p.name, entry.getValue()));
+        sb.append(header("السلّة"));
+        sb.append("<p class='sub'>راجع أغراضك قبل إتمام الطلب — الحساب: %s</p>"
+                .formatted(signedIn == null ? "زائر" : signedIn.name));
+        if (message != null && !message.isBlank())
+            sb.append("<p class='%s'>%s</p>".formatted(message.startsWith("تمت") ? "ok" : "err", message));
+        var items = demoCart.all();
+        if (items.isEmpty()) {
+            sb.append("<div class='card center'>سلّتك فارغة — <a href='/products'>تصفح المنتجات</a></div>");
+        } else {
+            sb.append("<div class='card table-wrap'><table><thead><tr><th>المنتج</th><th>الكمية</th><th>سعر القطعة</th><th>المجموع</th></tr></thead><tbody>");
+            for (var entry : items.entrySet()) {
+                Product p = repo.product(entry.getKey());
+                sb.append("<tr><td>%s</td><td>%d</td><td>%.2f دينار</td><td>%.2f دينار</td></tr>"
+                        .formatted(p.name, entry.getValue(), p.price, p.price * entry.getValue()));
+            }
+            sb.append("</tbody><tfoot><tr class='total'><td colspan='3'>المجموع الكلي</td><td>%.2f دينار</td></tr></tfoot></table></div>"
+                    .formatted(cartService.total(demoCart)));
+            sb.append("""
+                    <div class='card'><h3 style='margin:0 0 12px;font-size:1.05rem'>بيانات التوصيل والدفع</h3>
+                    <form method='post' action='/order' class='row'>
+                    <div><label>المسافة (كم)</label><input name='km' value='7' size='5'></div>
+                    <div><label>طريقة الدفع</label><select name='payment'>
+                    <option value='CASH'>نقداً عند التسليم</option>
+                    <option value='CARD'>بطاقة بنكية</option>
+                    <option value='WALLET'>المحفظة</option></select></div>
+                    <div><label>كود الخصم</label><input name='promo' placeholder='حرفة10 / طلاب5'></div>
+                    <div><label>رقم البطاقة (للبطاقة)</label><input name='card' size='18'></div>
+                    <button>تأكيد الطلب</button>
+                    </form></div>
+                    <div class='hint'>الحد الأدنى للطلب 5 دنانير · الشحن مجاني من 100 دينار</div>
+                    """);
         }
-        sb.append("</table>");
-        sb.append("<p>المجموع: %.2f دينار</p>".formatted(cartService.total(demoCart)));
-        sb.append("""
-                <form method='post' action='/order'>
-                العنوان (كم): <input name='km' size='4' value='7'>
-                الدفع: <select name='payment'><option>CASH</option><option>CARD</option><option>WALLET</option></select>
-                كود الخصم: <input name='promo'> رقم البطاقة (إن وجد): <input name='card'>
-                <button>تأكيد الطلب</button></form><a href='/products'>متابعة التسوق</a>
-                """);
-        sb.append(footer());
-        return sb.toString();
+        sb.append("<div style='margin-top:14px'><a class='btn' href='/products'>متابعة التسوق</a></div>");
+        return sb.toString() + footer();
     }
 
     private String doOrder(LinkedHashMap<String, String> params) {
@@ -156,7 +253,7 @@ public class WebServer {
                 params.getOrDefault("promo", ""), LocalDateTime.now());
         if (out.ok()) {
             demoCart.clear();
-            return orderPage(out.message() + " | الوقت المتوقع للوصول " + eta.estimate(km, 0) + " دقيقة");
+            return orderPage(out.message() + " — الوقت المتوقع للوصول " + eta.estimate(km, 0) + " دقيقة");
         }
         return orderPage(out.message());
     }
@@ -164,9 +261,12 @@ public class WebServer {
     private String orderPage(String message) {
         StringBuilder sb = new StringBuilder();
         sb.append(header("إتمام الطلب"));
-        if (message != null && !message.isBlank()) sb.append("<p>%s</p>".formatted(message));
-        sb.append("<a href='/products'>رجوع للمنتجات</a>").append(footer());
-        return sb.toString();
+        boolean ok = message == null || message.startsWith("تم إنشاء");
+        if (message != null && !message.isBlank())
+            sb.append("<p class='%s'>%s</p>".formatted(ok ? "ok" : "err", message));
+        sb.append("<div class='row'><a class='btn' href='/products'>المنتجات</a>"
+                + "<a class='btn' href='/cart'>السلّة</a><a class='btn' href='/wallet'>المحفظة</a></div>");
+        return sb.toString() + footer();
     }
 
     private String doWallet(LinkedHashMap<String, String> params) {
@@ -179,39 +279,49 @@ public class WebServer {
         StringBuilder sb = new StringBuilder();
         sb.append(header("المحفظة"));
         double balance = signedIn == null ? 0 : signedIn.wallet;
-        if (message != null && !message.isBlank()) sb.append("<p>%s</p>".formatted(message));
+        if (message != null && !message.isBlank())
+            sb.append("<p class='%s'>%s</p>".formatted(message.startsWith("تم شحن") ? "ok" : "err", message));
+        double dbBalance = signedIn == null ? balance : repo.customer(signedIn.id).wallet;
         sb.append("""
-                <form method='post' action='/wallet'>
-                المبلغ: <input name='amount' size='6'><button>شحن</button></form>
-                <p>الرصيد الحالي: %.2f دينار</p>
-                """.formatted(balance));
-        sb.append(footer());
-        return sb.toString();
+                <div class='card center'><div class='balance'>%.2f دينار</div><div class='sub'>الرصيد الحالي</div></div>
+                <div class='card'><form method='post' action='/wallet' class='row'>
+                <div><label>المبلغ (1 – 1000 دينار)</label><input name='amount' size='8'></div>
+                <button>شحن الرصيد</button>
+                </form></div>
+                """.formatted(dbBalance));
+        return sb.toString() + footer();
     }
 
     private String adminPage(String artisanIdParam) {
         StringBuilder sb = new StringBuilder();
         sb.append(header("تقارير الحرفيين"));
+        sb.append("<p class='sub'>عدد الطلبات والإيراد لكل حرفي خلال فترة محددة</p>");
         sb.append("""
-                <form method='get' action='/admin'>
-                رقم الحرفي: <input name='id' value='%s' size='3'>
-                من: <input name='from' value='%s'> إلى: <input name='to' value='%s'>
-                <button>اعرض</button></form>
-                """.formatted(artisanIdParam == null ? "1" : artisanIdParam, LocalDateTime.now().toLocalDate(), LocalDateTime.now().toLocalDate()));
+                <div class='card'><form method='get' action='/admin' class='row'>
+                <div><label>رقم الحرفي</label><input name='id' value='%s' size='3'></div>
+                <div><label>من</label><input name='from' value='%s'></div>
+                <div><label>إلى</label><input name='to' value='%s'></div>
+                <button>اعرض التقرير</button>
+                </form></div>
+                """.formatted(artisanIdParam == null ? "1" : artisanIdParam,
+                LocalDateTime.now().toLocalDate(), LocalDateTime.now().toLocalDate()));
         if (artisanIdParam != null) {
             int aid = Integer.parseInt(artisanIdParam);
             Artisan a = repo.artisan(aid);
             if (a != null) {
-                ReportService.ArtisanReport r = reportService.artisanReport(aid, LocalDateTime.now().toLocalDate().atStartOfDay(), LocalDateTime.now().plusDays(1));
+                ReportService.ArtisanReport r = reportService.artisanReport(aid,
+                        LocalDateTime.now().toLocalDate().atStartOfDay(), LocalDateTime.now().plusDays(1));
                 sb.append("""
-                        <p>%s (%s): %s — عدد القطع المبيعة %d، متوسط التقييم %.1f</p>
+                        <div class='card'><h3 style='margin:0 0 8px'>%s <span class='tag'>%s</span></h3>
+                        <p style='margin:0 0 10px'>%s</p>
+                        <p style='margin:0'><b>عدد القطع المبيعة:</b> %d · <b>متوسط التقييم:</b> %.1f /
+                        5</div>
                         """.formatted(a.name, a.craft, r.message(), r.itemsCount(), a.rating()));
             } else {
-                sb.append("<p>الحرفي غير موجود</p>");
+                sb.append("<p class='err'>الحرفي غير موجود</p>");
             }
         }
-        sb.append(footer());
-        return sb.toString();
+        return sb.toString() + footer();
     }
 
     private LinkedHashMap<String, String> parseForm(String body) {
@@ -228,47 +338,56 @@ public class WebServer {
     }
 
     private String formPage() {
-        return header("تسجيل جديد") + """
-                <h3>عميل جديد</h3>
-                <form method='post' action='/register'>
+        StringBuilder sb = new StringBuilder();
+        sb.append(header("تسجيل جديد"));
+        sb.append("""
+                <div class='card'>
+                <h3 style='margin:0 0 12px;font-size:1.05rem'>عميل جديد</h3>
+                <form method='post' action='/register' class='row'>
                 <input type='hidden' name='role' value='customer'>
-                الاسم: <input name='name'> الهاتف: <input name='phone'> البريد: <input name='email'> كلمة المرور: <input name='password' type='password'>
-                <button>سجّل</button></form>
-                <h3>حرفي / حرفية جديدة</h3>
-                <form method='post' action='/register'>
+                <div><label>الاسم الكامل</label><input name='name' required></div>
+                <div><label>الهاتف (07XXXXXXXXX)</label><input name='phone' required></div>
+                <div><label>البريد الإلكتروني</label><input name='email' type='email' required></div>
+                <div><label>كلمة المرور (8+ خانات)</label><input name='password' type='password' required></div>
+                <button>سجّل</button>
+                </form></div>
+                <div class='card'>
+                <h3 style='margin:0 0 12px;font-size:1.05rem'>حرفي / حرفية جديدة</h3>
+                <form method='post' action='/register' class='row'>
                 <input type='hidden' name='role' value='artisan'>
-                الاسم: <input name='name'> الهاتف: <input name='phone'>
-                الفئة: <select name='craft'><option>تطريز</option><option>صابون</option><option>خشبيات</option><option>جلوديات</option><option>سيراميك</option><option>مجوهرات</option></select>
-                <button>سجّل</button></form>
-                """ + footer();
+                <div><label>الاسم</label><input name='name' required></div>
+                <div><label>الهاتف</label><input name='phone' required></div>
+                <div><label>الفئة</label><select name='craft'><option>تطريز</option><option>صابون</option>
+                <option>خشبيات</option><option>جلوديات</option><option>سيراميك</option><option>مجوهرات</option></select></div>
+                <button>سجّل</button>
+                </form></div>
+                """);
+        return sb.toString() + footer();
     }
 
     private String loginPage(String message) {
-        return header("دخول") + "<p>" + message + "</p>" + """
+        StringBuilder sb = new StringBuilder();
+        sb.append(header("دخول"));
+        if (message != null && !message.isBlank()) sb.append("<p class='err'>").append(message).append("</p>");
+        sb.append("""
+                <div class='card' style='max-width:420px;margin:0 auto'>
                 <form method='post' action='/login'>
-                البريد: <input name='email'> كلمة المرور: <input name='password' type='password'>
-                <button>دخول</button></form><a href='/register'>حساب جديد</a>
-                """ + footer();
+                <label>البريد الإلكتروني</label><input name='email' type='email' required
+                 style='width:100%;margin-bottom:10px'>
+                <label>كلمة المرور</label><input name='password' type='password' required
+                 style='width:100%;margin-bottom:14px'>
+                <button style='width:100%'>دخول</button>
+                </form>
+                <p style='margin-top:12px;font-size:.9rem;color:#8a7a63'>ليس لديك حساب؟
+                <a href='/register'>سجّل الآن</a></p>
+                </div>
+                """);
+        return sb.toString() + footer();
     }
 
     private String notFound() {
-        return header("404") + "<p>الصفحة غير موجودة</p>" + footer();
-    }
-
-    private String header(String title) {
-        return """
-                <!DOCTYPE html><html lang='ar' dir='rtl'><head><meta charset='utf-8'>
-                <title>حِرفة - %s</title><style>
-                body{font-family:'Segoe UI',Tahoma,sans-serif;margin:24px;background:#faf7f2}
-                table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px 12px}
-                th{background:#e8dcc8}.ok{color:#0a7d32}.err{color:#b3261e}
-                a{color:#8a5a00}button{cursor:pointer}
-                </style></head><body><h1>حِرفة — منصة توصيل الأعمال اليدوية</h1><h2>%s</h2>
-                """.formatted(title, title);
-    }
-
-    private String footer() {
-        return "</body></html>";
+        return header("404") + "<div class='card center'>الصفحة غير موجودة — "
+                + "<a href='/products'>إلى المنتجات</a></div>" + footer();
     }
 
     public static void main(String[] args) throws IOException {
