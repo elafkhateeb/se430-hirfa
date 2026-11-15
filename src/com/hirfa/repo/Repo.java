@@ -141,6 +141,23 @@ public class Repo implements AutoCloseable {
         update("UPDATE orders SET status=? WHERE id=?", status.name(), orderId);
     }
 
+public List<Artisan> artisans() {
+        return queryList("SELECT * FROM artisans ORDER BY id", Repo::artisanMapper);
+    }
+
+    public List<Order> ordersByCustomer(int customerId) {
+        List<Order> list = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM orders WHERE customer_id=? ORDER BY id DESC")) {
+            ps.setInt(1, customerId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) list.add(order(rs.getInt(1)));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+        return list;
+    }
+
     public List<Integer> orderIdsBetween(LocalDateTime from, LocalDateTime to) {
         List<Integer> ids = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM orders WHERE created_at>=? AND created_at<=? ORDER BY id")) {
