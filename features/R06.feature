@@ -1,11 +1,11 @@
-Feature: البحث عن المنتجات اليدوية
+Feature: Search the product catalog
 
-Scenario: بحث حسب الفئة
-Given منتجات مضافة ضمن الفئة "صابون"
-When البحث بالفئة "صابون"
-Then يعرض النظام منتجَي "صابون زيت الغار" و"صابون حبة البركة" فقط
+Scenario: Filter products by craft
+  Given the catalog contains products in several crafts
+  When a visitor selects "Soap"
+  Then only soap products are displayed
 
-Scenario: بحث بسعر أقصى
-Given منتجات بأسعار مختلفة
-When البحث بحد أقصى "10.0" دنانير
-Then يعرض النظام المنتجات التي سعرها ≤ 10 دنانير فقط
+Scenario: Filter products by maximum price
+  Given the catalog contains products at different prices
+  When a visitor sets the maximum price to 10 JOD
+  Then products above 10 JOD are excluded

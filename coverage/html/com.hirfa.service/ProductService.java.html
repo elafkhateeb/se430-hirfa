@@ -17,34 +17,37 @@ public class ProductService {
 <span class="fc" id="L17">    }</span>
 
     public Outcome add(int artisanId, String name, String craft, double price, int stock) {
-<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (!validation.validName(name)) return Outcome.fail(&quot;اسم المنتج مطلوب&quot;);</span>
-<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (!validation.validCraft(craft)) return Outcome.fail(&quot;الفئة غير معتمدة&quot;);</span>
-<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (price &lt;= 0) return Outcome.fail(&quot;السعر يجب أن يكون أكبر من صفر&quot;);</span>
-<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (price &gt; MAX_PRICE) return Outcome.fail(&quot;السعر يتجاوز الحد الأقصى 1000 دينار&quot;);</span>
-<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (stock &lt; 0) return Outcome.fail(&quot;المخزون لا يمكن أن يكون سالباً&quot;);</span>
-<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (stock &gt; MAX_STOCK) return Outcome.fail(&quot;المخزون يتجاوز الحد الأقصى 500 قطعة&quot;);</span>
-<span class="fc" id="L26">        int id = repo.insertProduct(new Product(0, artisanId, name.trim(), craft, price, stock));</span>
-<span class="fc" id="L27">        return new Outcome(true, &quot;تم إضافة المنتج &quot; + name.trim() + &quot; بسعر &quot; + price + &quot; دينار&quot;, id);</span>
+<span class="fc" id="L20">        var artisan = repo.artisan(artisanId);</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (artisan == null) return Outcome.fail(&quot;Artisan not found.&quot;);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (!validation.validName(name)) return Outcome.fail(&quot;Enter a product name using English letters.&quot;);</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (!validation.validCraft(craft)) return Outcome.fail(&quot;Choose a supported craft.&quot;);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (!artisan.craft.equals(craft)) return Outcome.fail(&quot;Products must use the artisan's registered craft.&quot;);</span>
+<span class="pc bpc" id="L25" title="1 of 4 branches missed.">        if (!Double.isFinite(price) || price &lt;= 0) return Outcome.fail(&quot;Price must be greater than 0 JOD.&quot;);</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        if (price &gt; MAX_PRICE) return Outcome.fail(&quot;Price cannot exceed 1000 JOD.&quot;);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (stock &lt; 0) return Outcome.fail(&quot;Stock cannot be negative.&quot;);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (stock &gt; MAX_STOCK) return Outcome.fail(&quot;Stock cannot exceed 500 items.&quot;);</span>
+<span class="fc" id="L29">        int id = repo.insertProduct(new Product(0, artisanId, name.trim(), craft, price, stock));</span>
+<span class="fc" id="L30">        return new Outcome(true, &quot;Product &quot; + name.trim() + &quot; added at &quot; + price + &quot; JOD.&quot;, id);</span>
     }
 
     public Outcome restock(int productId, int amount) {
-<span class="fc" id="L31">        Product p = repo.product(productId);</span>
-<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (p == null) return Outcome.fail(&quot;المنتج غير موجود&quot;);</span>
-<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (amount &lt;= 0) return Outcome.fail(&quot;الكمية غير صحيحة&quot;);</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (p.stock + amount &gt; MAX_STOCK) return Outcome.fail(&quot;المخزون يتجاوز الحد الأقصى 500 قطعة&quot;);</span>
-<span class="fc" id="L35">        p.stock += amount;</span>
-<span class="fc" id="L36">        repo.saveProduct(p);</span>
-<span class="fc" id="L37">        return new Outcome(true, &quot;تم إعادة التخزين، الكمية الحالية &quot; + p.stock, p.stock);</span>
+<span class="fc" id="L34">        Product p = repo.product(productId);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (p == null) return Outcome.fail(&quot;Product not found.&quot;);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (amount &lt;= 0) return Outcome.fail(&quot;Restock quantity must be positive.&quot;);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if ((long) p.stock + amount &gt; MAX_STOCK) return Outcome.fail(&quot;Stock cannot exceed 500 items.&quot;);</span>
+<span class="fc" id="L38">        p.stock += amount;</span>
+<span class="fc" id="L39">        repo.saveProduct(p);</span>
+<span class="fc" id="L40">        return new Outcome(true, &quot;Stock updated to &quot; + p.stock + &quot;.&quot;, p.stock);</span>
     }
 
     public List&lt;Product&gt; search(String craft, Double maxPrice) {
-<span class="fc" id="L41">        List&lt;Product&gt; out = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (Product p : repo.products()) {</span>
-<span class="fc bfc" id="L43" title="All 6 branches covered.">            if (craft != null &amp;&amp; !craft.isBlank() &amp;&amp; !p.craft.equals(craft)) continue;</span>
-<span class="fc bfc" id="L44" title="All 4 branches covered.">            if (maxPrice != null &amp;&amp; p.price &gt; maxPrice) continue;</span>
-<span class="fc" id="L45">            out.add(p);</span>
-<span class="fc" id="L46">        }</span>
-<span class="fc" id="L47">        return out;</span>
+<span class="fc" id="L44">        List&lt;Product&gt; out = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (Product p : repo.products()) {</span>
+<span class="fc bfc" id="L46" title="All 6 branches covered.">            if (craft != null &amp;&amp; !craft.isBlank() &amp;&amp; !p.craft.equals(craft)) continue;</span>
+<span class="fc bfc" id="L47" title="All 4 branches covered.">            if (maxPrice != null &amp;&amp; p.price &gt; maxPrice) continue;</span>
+<span class="fc" id="L48">            out.add(p);</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        return out;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

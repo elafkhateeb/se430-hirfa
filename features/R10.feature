@@ -1,11 +1,11 @@
-Feature: تطبيق كود خصم على الطلب
+Feature: Apply a promotion
 
-Scenario: كود حرفة10 على طلب قيمته 10 دنانير أو أكثر
-Given الطلب قيمته "40.5" دنانير والكود "حرفة10"
-When طلب التطبيق
-Then يظهر "تم تطبيق خصم 10%" وفق قيمة خصم "4.05" دينار
+Scenario: Apply HIRFA10 to an eligible subtotal
+  Given the subtotal is at least 10 JOD
+  When the customer enters "HIRFA10"
+  Then a 10 percent discount is applied
 
-Scenario: كود غير معتمد
-Given الكود "خصم50"
-When طلب التطبيق
-Then يرفض النظام ويظهر "الكود غير معتمد"
+Scenario: Reject HIRFA10 below its minimum
+  Given the subtotal is below 10 JOD
+  When the customer enters "HIRFA10"
+  Then no discount is applied and an eligibility message is shown

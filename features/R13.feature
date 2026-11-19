@@ -1,11 +1,11 @@
-Feature: تتبع حالة الطلب
+Feature: Advance an order status
 
-Scenario: ينتقل الطلب عبر حالاته
-Given طلب بحالة "جديد"
-When تحديث الحالة ثلاث مرات متتالية
-Then ينتقل بترتيب: "قيد التحضير" ثم "قيد التوصيل" ثم "تم التسليم"
+Scenario: Advance to the next valid state
+  Given an order is in the new state
+  When the order advances
+  Then its state becomes preparing
 
-Scenario: محاولة تحديث طلب تم تسليمه
-Given طلب بحالة "تم التسليم"
-When طلب تحديث الحالة
-Then يرفض النظام ويظهر "لا توجد حالة تالية"
+Scenario: Do not advance a terminal order
+  Given an order is delivered
+  When the order advances
+  Then its state remains delivered

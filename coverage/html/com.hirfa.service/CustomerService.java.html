@@ -15,20 +15,21 @@ public class CustomerService {
 <span class="fc" id="L15">    }</span>
 
     public Outcome register(String name, String phone, String email, String password) {
-<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (!validation.validName(name)) return Outcome.fail(&quot;الاسم مطلوب&quot;);</span>
-<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (!validation.validPhone(phone)) return Outcome.fail(&quot;رقم الهاتف غير صحيح، مثال: 0791234567&quot;);</span>
-<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (!validation.validEmail(email)) return Outcome.fail(&quot;البريد الإلكتروني غير صحيح&quot;);</span>
-<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (!validation.validPassword(password)) return Outcome.fail(&quot;كلمة المرور ضعيفة: 8 خانات على الأقل مع أحرف وأرقام&quot;);</span>
-<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (repo.customerByEmail(email) != null) return Outcome.fail(&quot;البريد الإلكتروني مسجل مسبقاً&quot;);</span>
-<span class="fc" id="L23">        int id = repo.insertCustomer(new Customer(0, name.trim(), phone, email, password, 0, 0));</span>
-<span class="fc" id="L24">        return new Outcome(true, &quot;مرحباً &quot; + name.trim() + &quot;، تم إنشاء حسابك بنجاح&quot;, id);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (!validation.validName(name)) return Outcome.fail(&quot;Enter a valid name using English letters.&quot;);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (!validation.validPhone(phone)) return Outcome.fail(&quot;Enter a valid Jordanian mobile number.&quot;);</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (!validation.validEmail(email)) return Outcome.fail(&quot;Enter a valid email address.&quot;);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (!validation.validPassword(password)) return Outcome.fail(&quot;Password must contain at least 8 characters, letters, and numbers.&quot;);</span>
+<span class="fc" id="L22">        String normalizedEmail = email.trim().toLowerCase();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (repo.customerByEmail(normalizedEmail) != null) return Outcome.fail(&quot;This email is already registered.&quot;);</span>
+<span class="fc" id="L24">        int id = repo.insertCustomer(new Customer(0, name.trim(), phone, normalizedEmail, password, 0, 0));</span>
+<span class="fc" id="L25">        return new Outcome(true, &quot;Welcome, &quot; + name.trim() + &quot;! Your account has been created.&quot;, id);</span>
     }
 
     public Outcome login(String email, String password) {
-<span class="fc" id="L28">        Customer c = repo.customerByEmail(email);</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (c == null) return Outcome.fail(&quot;البريد الإلكتروني غير مسجل&quot;);</span>
-<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (!c.password.equals(password)) return Outcome.fail(&quot;كلمة المرور غير صحيحة&quot;);</span>
-<span class="fc" id="L31">        return Outcome.ok(&quot;مرحباً بك مجدداً، &quot; + c.name, c.id);</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        Customer c = email == null ? null : repo.customerByEmail(email.trim().toLowerCase());</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (c == null) return Outcome.fail(&quot;Email is not registered.&quot;);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (!c.password.equals(password)) return Outcome.fail(&quot;Incorrect password.&quot;);</span>
+<span class="fc" id="L32">        return Outcome.ok(&quot;Welcome back, &quot; + c.name + &quot;.&quot;, c.id);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

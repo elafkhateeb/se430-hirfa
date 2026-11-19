@@ -12,20 +12,32 @@ public class ArtisanService {
 <span class="fc" id="L12">        this.repo = repo;</span>
 <span class="fc" id="L13">    }</span>
 
-    public Outcome register(String name, String phone, String craft) {
-<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (!validation.validName(name)) return Outcome.fail(&quot;الاسم مطلوب&quot;);</span>
-<span class="fc bfc" id="L17" title="All 2 branches covered.">        if (!validation.validPhone(phone)) return Outcome.fail(&quot;رقم الهاتف غير صحيح، مثال: 0791234567&quot;);</span>
-<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (!validation.validCraft(craft)) return Outcome.fail(&quot;الفئة غير معتمدة: تطريز، صابون، خشبيات، جلوديات، سيراميك، مجوهرات&quot;);</span>
-<span class="fc" id="L19">        int id = repo.insertArtisan(new Artisan(0, name.trim(), craft, 0, 0));</span>
-<span class="fc" id="L20">        return new Outcome(true, &quot;تم تسجيل &quot; + name.trim() + &quot; كحرفي في فئة &quot; + craft, id);</span>
+    public Outcome register(String name, String phone, String craft, String email, String password) {
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (!validation.validName(name)) return Outcome.fail(&quot;Enter a valid name using English letters.&quot;);</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        if (!validation.validPhone(phone)) return Outcome.fail(&quot;Enter a valid Jordanian mobile number.&quot;);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (!validation.validCraft(craft)) return Outcome.fail(&quot;Choose a supported craft.&quot;);</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (!validation.validEmail(email)) return Outcome.fail(&quot;Enter a valid email address.&quot;);</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        if (!validation.validPassword(password)) return Outcome.fail(&quot;Password must contain at least 8 characters, letters, and numbers.&quot;);</span>
+<span class="fc" id="L21">        String normalizedEmail = email.trim().toLowerCase();</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (repo.artisanByEmail(normalizedEmail) != null) return Outcome.fail(&quot;An artisan account already uses this email.&quot;);</span>
+<span class="fc" id="L23">        int id = repo.insertArtisan(new Artisan(0, name.trim(), craft, normalizedEmail, password, 0, 0));</span>
+<span class="fc" id="L24">        return new Outcome(true, &quot;Artisan account created for &quot; + name.trim() + &quot;.&quot;, id);</span>
+    }
+
+    public Outcome login(String email, String password) {
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        Artisan artisan = email == null ? null : repo.artisanByEmail(email.trim().toLowerCase());</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (artisan == null) return Outcome.fail(&quot;Email is not registered.&quot;);</span>
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">        if (artisan.password == null || !artisan.password.equals(password))</span>
+<span class="fc" id="L31">            return Outcome.fail(&quot;Incorrect password.&quot;);</span>
+<span class="fc" id="L32">        return Outcome.ok(&quot;Welcome back, &quot; + artisan.name + &quot;.&quot;, artisan.id);</span>
     }
 
     public Outcome rateArtisan(int artisanId, int stars) {
-<span class="fc bfc" id="L24" title="All 4 branches covered.">        if (stars &lt; 1 || stars &gt; 5) return Outcome.fail(&quot;التقييم يجب أن يكون بين 1 و 5&quot;);</span>
-<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (repo.artisan(artisanId) == null) return Outcome.fail(&quot;الحرفي غير موجود&quot;);</span>
-<span class="fc" id="L26">        repo.rateArtisan(artisanId, stars);</span>
-<span class="fc" id="L27">        Artisan a = repo.artisan(artisanId);</span>
-<span class="fc" id="L28">        return new Outcome(true, &quot;شكراً لتقييمك، متوسط تقييم &quot; + a.name + &quot; صار &quot; + a.rating(), a.rating());</span>
+<span class="fc bfc" id="L36" title="All 4 branches covered.">        if (stars &lt; 1 || stars &gt; 5) return Outcome.fail(&quot;Rating must be between 1 and 5.&quot;);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (repo.artisan(artisanId) == null) return Outcome.fail(&quot;Artisan not found.&quot;);</span>
+<span class="fc" id="L38">        repo.rateArtisan(artisanId, stars);</span>
+<span class="fc" id="L39">        Artisan a = repo.artisan(artisanId);</span>
+<span class="fc" id="L40">        return new Outcome(true, &quot;Thank you for rating &quot; + a.name + &quot;. The new average is &quot; + a.rating() + &quot;.&quot;, a.rating());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

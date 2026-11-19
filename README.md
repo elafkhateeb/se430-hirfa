@@ -1,115 +1,68 @@
-# حِرفة — منصة توصيل الأعمال اليدوية | SE430 Software Testing Project
+# Hirfa — Handmade Delivery Platform
 
-<div dir="rtl">
+Hirfa is a Java web application that connects customers with Jordanian artisans selling handmade goods. It includes a SQLite catalog, customer and artisan accounts, shopping cart and checkout flows, wallet payments, order management, and artisan product tools.
 
-«حِرفة» منصة تربط الحرفيين الأردنيين (تطريز، صابون، خشبيات، مجوهرات، جلوديات، سيراميك) بالمشترين مع خدمة توصيل.
-طوّرها فريق من طلبة مادة SE430 — اختبار البرمجيات في جامعة العلوم والتكنولوجيا الأردنية (خريف 2026) كمنصة واقعية
-تمرّنوا عليها على دورة حياة الاختبار كاملة: متطلبات موثقة بـ BDD، جداول صندوق أسود، اختبارات آلية بـ JUnit 5،
-وقياس تغطية بـ JaCoCo.
+**GitHub:** [elafkhateeb/se430-hirfa](https://github.com/elafkhateeb/se430-hirfa)
 
-| اختبارات JUnit | تغطية الفروع | تغطية العبارات | المتطلبات |
-|:---:|:---:|:---:|:---:|
-| 145/145 ناجحة ✔ | 100% (203/203) | 99.7% | 20 متطلباً |
+## Features
 
-## فكرة المشروع
+- Browse products and filter by craft or maximum price.
+- Register and sign in as a customer or artisan.
+- Add products to a customer cart, review the cart, and check out.
+- Pay with cash on delivery, card, or wallet; apply supported promotional codes.
+- Review order history, wallet balance, delivery estimates, and artisan profiles.
+- Let artisans add products and restock only products belonging to their account.
+- Rate artisans and generate artisan sales reports.
+- Store application data in SQLite.
 
-العميل يسجل حساباً، يتسوق من منتجات الحرفيين، يضيفها للسلة (1–5 قطع لكل منتج)، ويؤكد الطلب
-(قيمة معقولة على الأقل 5 دنانير) مع طريقة دفع (كاش عند التسليم، بطاقة، أو محفظة) وكود خصم اختياري.
-النظام يحسب رسوم التوصيل حسب المسافة، ووقت التوصيل المتوقع، ويدير دورة حياة الطلب
-(جديد ← قيد التحضير ← قيد التوصيل ← تم التسليم) مع إمكانية الإلغاء خلال أول ساعتين.
-بعد التسليم يقيم العميل الحرفي، ويترقى مكان العميل في مستويات الولاء حسب طلباته.
+## Requirements
 
-## المتطلبات العشرون
+- JDK 17 or later
+- The SQLite JDBC, JUnit, SLF4J, and JaCoCo libraries included in `lib/`
 
-| # | المتطلب | القاعدة الأساسية |
-|---|---|---|
-| 1 | تسجيل عميل جديد | بريد غير مكرر، هاتف أردني، كلمة مرور قوية |
-| 2 | تسجيل الدخول | بريد + كلمة مرور للأعضاء فقط |
-| 3 | تسجيل حرفي | فئة من الفئات المعتمدة فقط |
-| 4 | إضافة منتج | سعر 0.01–1000 دينار ومخزون 0–500 |
-| 5 | إعادة تخزين | كمية موجبة دون تجاوز السقف 500 |
-| 6 | البحث عن المنتجات | فلترة بالفئة وأقصى سعر |
-| 7 | إضافة للسلة | 1–5 قطع وبقدر المخزون |
-| 8 | إنشاء الطلب | سلة غير فارغة ودفع مصرّح به |
-| 9 | رسوم التوصيل | حسب المسافة وشحن مجاني ≥ 100 دينار |
-| 10 | كود الخصم | حرفة10 (10% بحد أدنى 10) وطلاب5 (5%) |
-| 11 | تنفيذ الدفع | كاش حتى 500، بطاقة 16 رقماً، محفظة برصيد كافٍ |
-| 12 | إلغاء الطلب | فقط للحالة «جديد» خلال ساعتين مع استرداد المحفظة |
-| 13 | تحديث الحالة | تسلسل صارم بلا حالات بعد النهائيتين |
-| 14 | تقييم الحرفي | من 1 إلى 5 نجوم مع تحديث المتوسط فوراً |
-| 15 | شحن المحفظة | 1–1000 دينار في كل عملية |
-| 16 | الحد الأدنى للطلب | 5 دنانير على الأقل |
-| 17 | تعديل كمية في السلة | ضمن 1–5 وبقدر المخزون |
-| 18 | وقت التوصيل المتوقع | 30 دقيقة + 6×كم، إضافات للبُعد والذروة |
-| 19 | تقرير مبيعات الحرفي | عدد الطلبات والإيراد خلال فترة |
-| 20 | مستوى الولاء | برونزي/فضي/ذهبي/ماسي بخصومات تلقائية |
+No external build tool is required.
 
-كل متطلب موثق بسيناريو Gherkin في `features/R01..R20.feature`.
+## Run the website
 
-## أعضاء الفريق ومهامّهم
-
-| العضو | المهام |
-|---|---|
-| إيلاف الخطيب | متطلبات الحرفي (3، 14)، رسوم التوصيل (9)، المحفظة والولاء (15، 20)، ملفات Gherkin، تقرير التغطية |
-| دانا حداد | طبقة القاعدة والنماذج، السلة (7، 17)، الدفع (11)، دورة حياة الطلب (12، 13)، تقرير الحرفي (19) |
-| رغد عنانبة | المنتجات (4–6)، كود الخصم (10)، تقدير وقت التوصيل (18)، مهام الإعداد الأساسية للخدمات |
-| آلاء العمري | التسجيل والدخول (1، 2)، إنشاء الطلب (8، 16)، واجهة الويب، قياس التغطية وتوثيق التشغيل |
-
-## المنهجية والاختبارات
-
-- **تجزئة التكافؤ:** كل مدخلات المتطلب تُقسم إلى فئات متكافئة (صحيحة/فارغة/فوق الحد) بحالة اختبار للفئة.
-- **قيم الحدود (2-BVA):** لكل حد رقمي ثلاث حالات: قبل الحد، عند الحد، وبعده (كـ 119/120/121 دقيقة للإلغاء، أو 0.01/1000.01 للسعر).
-- **تغطية العبارات:** اختبار يضمن تنفيذ كل عبارة في شيفرة الدالة.
-- **تغطية الفروع:** كل فرع (if/switch/حلقة) يُختبر بطرفيه الصادق والكاذب — وقد تحقق 100% آلياً (203/203).
-
-جميع الاختبارات توجد في `test/com/hirfa/`، وكل متطلب مرتبط بدالته في مصفوفة التتبع أدناه.
-
-## بنية المستودع
-
-```
-src/          نماذج المجال، طبقة القاعدة، خدمات العمل، خادم الويب
-test/         اختبارات JUnit 5 لكل متطلب (12 صنف اختبار)
-features/     سيناريوهات Gherkin للمتطلبات العشرين (R01..R20)
-coverage/     تقرير JaCoCo التفاعلي وملخّص CSV
-lib/          مكتبات مرفقة: sqlite-jdbc، slf4j، junit-console، jacoco
-```
-
-## المتطلبات التقنية
-
-JDK 17 أو أحدث — لا حاجة لأي أداة بناء خارجية؛ كل управляط في `lib/` مرفق مع المستودع.
-
-## تشغيل النظام (واجهة الويب)
+From the repository root:
 
 ```bash
+mkdir -p build
 javac -cp lib/sqlite-jdbc.jar -d build $(find src -name '*.java')
 java -cp "build:lib/sqlite-jdbc.jar:lib/slf4j-api.jar" com.hirfa.web.WebServer handmade.db 8080
 ```
 
-ثم افتح المتصفح على: `http://localhost:8080`
+Open [http://localhost:8080](http://localhost:8080). The database and initial product catalog are created automatically on first run.
 
-| الصفحة | ما فيها |
+### Main pages
+
+| Page | Purpose |
 |---|---|
-| `/` و `/products` | استعراض المنتجات والبحث بالفئة وبأقصى سعر |
-| `/register` | تسجيل عميل جديد أو حرفي |
-| `/login` | تسجيل الدخول |
-| `/cart` | إضافة منتجات وتعديل الكميات (1–5 لكل منتج) |
-| `/order` | إتمام الطلب: كاش/بطاقة/محفظة + كود خصم |
-| `/wallet` | شحن المحفظة (حتى 1000 دينار) |
-| `/admin?id=1` | تقرير مبيعات حرفي (عدد الطلبات والإيراد) |
+| `/products` | Browse, filter, and add available products to a cart |
+| `/register` | Create a customer or artisan account |
+| `/login` | Sign in using the selected account type |
+| `/cart` | Review the cart and continue shopping |
+| `/order` | Choose delivery and payment details and place an order |
+| `/wallet` | View or top up a customer wallet |
+| `/orders` | View the signed-in customer's order history |
+| `/artisan/dashboard` | Add or restock products owned by the signed-in artisan |
+| `/artisan` | Browse artisan profiles and ratings |
+| `/admin` | View artisan sales reports |
 
-قاعدة البيانات `handmade.db` تُنشأ وتُعبأ تلقائياً عند أول تشغيل: 3 حرفيين، 5 منتجات، عميلان، وأكواد الخصم.
+Artisan registration requires a name, Jordanian mobile number, email, password, and craft. After registration, the artisan is signed in and can manage products from the dashboard. Customers and artisans use separate account types at sign-in.
 
-## تشغيل الاختبارات
+## Run the tests
 
 ```bash
-javac -cp "build:lib/sqlite-jdbc.jar:lib/junit-console.jar" -d build $(find test src -name '*.java')
+mkdir -p build
+javac -cp "lib/sqlite-jdbc.jar:lib/junit-console.jar" -d build $(find src test -name '*.java')
 java -cp "lib/junit-console.jar:build:lib/sqlite-jdbc.jar:lib/slf4j-api.jar" \
   org.junit.platform.console.ConsoleLauncher --scan-classpath --details=tree
 ```
 
-النتيجة: **145 اختباراً ناجحاً، صفر إخفاقات.**
+The JUnit 5 suite covers customer and artisan accounts, product and cart rules, checkout and payment, order lifecycle, delivery fees, discounts, reports, wallet, and loyalty behavior.
 
-## قياس التغطية (JaCoCo)
+## Generate coverage
 
 ```bash
 java -javaagent:lib/jacocoagent.jar=destfile=coverage/jacoco.exec \
@@ -118,33 +71,58 @@ java -javaagent:lib/jacocoagent.jar=destfile=coverage/jacoco.exec \
 
 java -jar lib/jacococli.jar report coverage/jacoco.exec \
   --classfiles build/com/hirfa/service --classfiles build/com/hirfa/model \
+  --classfiles build/com/hirfa/repo --classfiles build/com/hirfa/web \
   --sourcefiles src --html coverage/html --csv coverage/summary.csv
 ```
 
-النتيجة على طبقتَي `service` و `model`:
+The HTML report is written to `coverage/html/index.html`.
 
-| المقياس | القيمة |
+## Project layout
+
+```text
+src/com/hirfa/model/       Domain models
+src/com/hirfa/repo/        SQLite persistence
+src/com/hirfa/service/     Business rules
+src/com/hirfa/web/         HTTP server and web pages
+test/com/hirfa/            JUnit 5 tests
+features/                  Gherkin requirements (R01–R20)
+requirements-and-tests.html
+requirements-and-tests.pdf English requirements and test-design report
+lib/                       Bundled runtime and test libraries
+```
+
+## Requirements and testing documentation
+
+The project documents 20 functional requirements using Gherkin scenarios, black-box equivalence partitioning and boundary-value cases, and JUnit tests for the service layer. The requirements and test report is available as [HTML](requirements-and-tests.html) and [PDF](requirements-and-tests.pdf).
+
+Regenerate the HTML report and standalone Gherkin files after editing the requirement or test-case data:
+
+```bash
+python3 gen_doc.py
+```
+
+## Team
+
+| Member | Focus areas |
 |---|---|
-| تغطية العبارات (Instructions) | 99.7% |
-| تغطية الفروع (Branches) | **100%** — 203 فرعاً مغطاة بالكامل |
+| Elaf Alkhatib | Artisan requirements, delivery fees, wallet and loyalty, requirements documentation |
+| Dana Haddad | Persistence and models, cart, payments, order lifecycle, artisan reports |
+| Raghed Ananbeh | Products, discounts, delivery estimates, service setup |
+| Alaa Alomari | Customer registration and login, checkout, web interface, test and coverage documentation |
 
-التقرير مع خرائط تغطية كل سطر: `coverage/html/index.html`
+## Traceability
 
-## مصفوفة التتبع: المتطلب → الشيفرة → الاختبار
-
-| المتطلبات | الدالة المختبرة | اختبار JUnit |
+| Requirements | Main implementation | JUnit tests |
 |---|---|---|
-| 1، 2 | `CustomerService.register` / `login` | `CustomerServiceTest` |
-| 3، 14 | `ArtisanService.register` / `rateArtisan` | `ArtisanServiceTest` |
-| 4، 5، 6 | `ProductService.add` / `restock` / `search` | `ProductServiceTest` |
-| 7، 17 | `CartService.addItem` / `changeQty` | `CartServiceTest` |
-| 8، 16 | `OrderService.place` | `OrderServiceTest` |
-| 9 | `DeliveryFeeCalculator.fee` | `DeliveryFeeCalculatorTest` |
-| 10 | `DiscountCalculator.apply` | `DiscountCalculatorTest` |
-| 11 | `PaymentService.pay` | `PaymentServiceTest` |
-| 12، 13 | `OrderLifecycleService.cancel` / `advance` | `OrderLifecycleServiceTest` |
-| 15، 20 | `WalletService.topUp` / `LoyaltyService.tierFor` | `WalletAndLoyaltyTest` |
-| 18 | `EtaCalculator.estimate` | `EtaCalculatorTest` |
-| 19 | `ReportService.artisanReport` | `ReportServiceTest` |
-
-</div>
+| 1–2 | `CustomerService` | `CustomerServiceTest` |
+| 3, 14 | `ArtisanService` | `ArtisanServiceTest` |
+| 4–6 | `ProductService` | `ProductServiceTest` |
+| 7, 17 | `CartService` | `CartServiceTest` |
+| 8, 16 | `OrderService` | `OrderServiceTest` |
+| 9 | `DeliveryFeeCalculator` | `DeliveryFeeCalculatorTest` |
+| 10 | `DiscountCalculator` | `DiscountCalculatorTest` |
+| 11 | `PaymentService` | `PaymentServiceTest` |
+| 12–13 | `OrderLifecycleService` | `OrderLifecycleServiceTest` |
+| 15, 20 | `WalletService`, `LoyaltyService` | `WalletAndLoyaltyTest` |
+| 18 | `EtaCalculator` | `EtaCalculatorTest` |
+| 19 | `ReportService` | `ReportServiceTest` |

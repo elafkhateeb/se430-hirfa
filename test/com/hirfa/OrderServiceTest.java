@@ -6,6 +6,7 @@ import com.hirfa.model.Order;
 import com.hirfa.model.Outcome;
 import com.hirfa.repo.Repo;
 import com.hirfa.service.OrderService;
+import com.hirfa.service.ProductService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
@@ -23,6 +24,10 @@ public class OrderServiceTest {
     void setUp() {
         repo = new Repo(":memory:");
         repo.seed();
+        repo.insertCustomer(new Customer(0, "Amal Al-Khatib", "0791234567",
+                "customer@example.com", "CustomerPass2026", 25, 3));
+        repo.insertCustomer(new Customer(0, "Reem Al-Shobaki", "0787654321",
+                "wallet@example.com", "WalletPass2026", 1, 0));
         service = new OrderService(repo);
         cart = new Cart();
         now = LocalDateTime.of(2026, 11, 8, 12, 0);
@@ -33,7 +38,7 @@ public class OrderServiceTest {
         cart.put(3, 2);
         Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "", now);
         assertTrue(out.ok());
-        assertTrue(out.message().contains("تم إنشاء الطلب رقم"));
+        assertTrue(out.message().contains("Order #"));
         assertEquals(28, repo.product(3).stock);
     }
 
@@ -41,7 +46,7 @@ public class OrderServiceTest {
     void place_emptyCart_rejected() {
         Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "", now);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("السلة فارغة"));
+        assertTrue(out.message().contains("cart is empty"));
     }
 
     @Test
@@ -49,7 +54,7 @@ public class OrderServiceTest {
         cart.put(3, 1);
         Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "", now);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("الحد الأدنى"));
+        assertTrue(out.message().contains("at least 5 JOD"));
     }
 
     @Test
@@ -57,7 +62,7 @@ public class OrderServiceTest {
         cart.put(4, 1);
         Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "", now);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("لم يعد متوفراً"));
+        assertTrue(out.message().contains("no longer available"));
     }
 
     @Test
@@ -65,7 +70,7 @@ public class OrderServiceTest {
         cart.put(3, 2);
         Outcome out = service.place(repo.customer(1), cart, 7, "BITCOIN", "", now);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("غير معتمدة"));
+        assertTrue(out.message().contains("not supported"));
     }
 
     @Test
@@ -77,16 +82,37 @@ public class OrderServiceTest {
     @Test
     void place_cardPayment_ok() {
         cart.put(3, 2);
-        Outcome out = service.place(repo.customer(1), cart, 7, "CARD", "", now);
+        Outcome out = service.place(repo.customer(1), cart, 7, "CARD", "",
+                "1234567890123456", now);
         assertTrue(out.ok());
+    }
+
+    @Test
+    void place_cardPayment_invalidNumber_rejected() {
+        cart.put(3, 2);
+        Outcome out = service.place(repo.customer(1), cart, 7, "CARD", "",
+                "1234", now);
+        assertFalse(out.ok());
+        assertTrue(out.message().contains("exactly 16 digits"));
+        assertEquals(30, repo.product(3).stock);
+    }
+
+    @Test
+    void place_cashPayment_overLimit_rejected() {
+        Outcome product = new ProductService(repo).add(1, "Premium Embroidered Set", "Embroidery", 1000, 1);
+        assertTrue(product.ok());
+        cart.put((int) product.value(), 1);
+        Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "", now);
+        assertFalse(out.ok());
+        assertTrue(out.message().contains("up to 500 JOD"));
     }
 
     @Test
     void place_invalidPromo_rejected() {
         cart.put(3, 2);
-        Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "خصم50", now);
+        Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "SAVE50", now);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("غير معتمد"));
+        assertTrue(out.message().contains("not supported"));
     }
 
     @Test
@@ -94,7 +120,7 @@ public class OrderServiceTest {
         cart.put(99, 1);
         Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "", now);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("لم يعد متوفراً"));
+        assertTrue(out.message().contains("no longer available"));
     }
 
     @Test
@@ -102,14 +128,14 @@ public class OrderServiceTest {
         cart.put(5, 1);
         Outcome out = service.place(repo.customer(2), cart, 10, "WALLET", "", now);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("غير كافٍ"));
+        assertTrue(out.message().contains("Insufficient wallet"));
     }
 
     @Test
     void place_withPromo_totalsCorrect() {
         cart.put(1, 2);
         cart.put(3, 3);
-        Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "حرفة10", now);
+        Outcome out = service.place(repo.customer(1), cart, 7, "CASH", "HIRFA10", now);
         assertTrue(out.ok());
         Order order = repo.order((int) out.value());
         assertEquals(40.5, order.subtotal, 0.001);

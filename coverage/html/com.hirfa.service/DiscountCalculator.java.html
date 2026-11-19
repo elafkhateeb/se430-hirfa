@@ -5,17 +5,17 @@ import com.hirfa.model.Outcome;
 <span class="fc" id="L5">public class DiscountCalculator {</span>
 
     public Outcome apply(String code, double subtotal) {
-<span class="fc bfc" id="L8" title="All 4 branches covered.">        if (code == null || code.isBlank()) return Outcome.ok(&quot;بدون كود خصم&quot;, 0);</span>
-<span class="fc bfc" id="L9" title="All 3 branches covered.">        switch (code.trim()) {</span>
-            case &quot;حرفة10&quot; -&gt; {
-<span class="fc bfc" id="L11" title="All 2 branches covered.">                if (subtotal &lt; 10) return Outcome.fail(&quot;الكود حرفة10 متاح للطلبات من 10 دنانير&quot;);</span>
-<span class="fc" id="L12">                return Outcome.ok(&quot;تم تطبيق خصم 10%&quot;, round(subtotal * 0.10));</span>
+<span class="fc bfc" id="L8" title="All 4 branches covered.">        if (code == null || code.isBlank()) return Outcome.ok(&quot;No promotion code.&quot;, 0);</span>
+<span class="fc bfc" id="L9" title="All 3 branches covered.">        switch (code.trim().toUpperCase()) {</span>
+            case &quot;HIRFA10&quot; -&gt; {
+<span class="fc bfc" id="L11" title="All 2 branches covered.">                if (subtotal &lt; 10) return Outcome.fail(&quot;HIRFA10 applies to orders of 10 JOD or more.&quot;);</span>
+<span class="fc" id="L12">                return Outcome.ok(&quot;HIRFA10 applied: 10% discount.&quot;, round(subtotal * 0.10));</span>
             }
-            case &quot;طلاب5&quot; -&gt; {
-<span class="fc" id="L15">                return Outcome.ok(&quot;تم تطبيق خصم 5%&quot;, round(subtotal * 0.05));</span>
+            case &quot;STUDENTS5&quot; -&gt; {
+<span class="fc" id="L15">                return Outcome.ok(&quot;STUDENTS5 applied: 5% discount.&quot;, round(subtotal * 0.05));</span>
             }
             default -&gt; {
-<span class="fc" id="L18">                return Outcome.fail(&quot;الكود &quot; + code.trim() + &quot; غير معتمد&quot;);</span>
+<span class="fc" id="L18">                return Outcome.fail(&quot;Promotion code &quot; + code.trim() + &quot; is not supported.&quot;);</span>
             }
         }
     }

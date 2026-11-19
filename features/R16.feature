@@ -1,11 +1,11 @@
-Feature: الحد الأدنى لقيمة الطلب
+Feature: Enforce the minimum order
 
-Scenario: طلب تحت الحد الأدنى
-Given سلة فيها "صابون زيت الغار x1" بقيمة 3.5 دنانير
-When طلب إتمام الطلب
-Then يرفض النظام ويظهر "الحد الأدنى لقيمة الطلب 5 دنانير"
+Scenario: Accept an order at the minimum
+  Given a customer cart has a subtotal of 5 JOD
+  When the customer confirms the order
+  Then checkout may continue
 
-Scenario: طلب ضمن الحد
-Given سلة فيها "صابون زيت الغار x2" بقيمة 7.0 دنانير
-When طلب إتمام الطلب
-Then يقبل النظام الطلب
+Scenario: Reject an order below the minimum
+  Given a customer cart has a subtotal of 4.99 JOD
+  When the customer confirms the order
+  Then no order is created

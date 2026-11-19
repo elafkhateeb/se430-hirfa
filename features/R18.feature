@@ -1,11 +1,11 @@
-Feature: تقدير وقت التوصيل
+Feature: Estimate delivery time
 
-Scenario: طلب بمسافة عادية
-Given مسافة "7" كم وعدد طلبات المنصة الجاريّة "10"
-When حساب الوقت المتوقع
-Then الوقت "72" دقيقة (30 + 6×7)
+Scenario: Estimate a standard delivery
+  Given the delivery distance is 5 kilometers and the current load is 10 orders
+  When the estimate is calculated
+  Then the estimate includes preparation and travel time
 
-Scenario: طلب في وقت الذروة
-Given المسافة "20" كم وعدد الطلبات النشطة "20" (أكبر من 15)
-When حساب الوقت المتوقع
-Then الوقت "195" دقيقة (30 + 120 + 45)
+Scenario: Add the high-load allowance
+  Given the delivery distance is 5 kilometers and the current load is 16 orders
+  When the estimate is calculated
+  Then the high-load allowance is included

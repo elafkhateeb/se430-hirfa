@@ -14,11 +14,11 @@ public class WalletService {
     }
 
     public Outcome topUp(Customer customer, double amount) {
-        if (amount < MIN_TOPUP) return Outcome.fail("أقل قيمة شحن هي دينار واحد");
-        if (amount > MAX_TOPUP) return Outcome.fail("أقصى قيمة شحن هي 1000 دينار");
+        if (!Double.isFinite(amount) || amount < MIN_TOPUP) return Outcome.fail("Minimum top-up is 1 JOD.");
+        if (amount > MAX_TOPUP) return Outcome.fail("Maximum top-up is 1000 JOD.");
         customer.wallet = round(customer.wallet + amount);
         repo.saveCustomer(customer);
-        return new Outcome(true, "تم شحن المحفظة، الرصيد الحالي " + customer.wallet + " دينار", customer.wallet);
+        return new Outcome(true, "Wallet topped up. Current balance: " + customer.wallet + " JOD.", customer.wallet);
     }
 
     private double round(double v) {

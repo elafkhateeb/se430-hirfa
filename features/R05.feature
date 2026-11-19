@@ -1,11 +1,11 @@
-Feature: إعادة تخزين منتج نافد
+Feature: Restock a product
 
-Scenario: إعادة تخزين منتج نافد مخزونه صفر
-Given المنتج "صابون حبة البركة" (رقم 4) مخزونه "0"
-When طلب إضافة "20" قطعة للمخزون
-Then يعدّل النظام المخزون إلى "20" ويظهر "تم إعادة التخزين، الكمية الحالية 20"
+Scenario: Restock an available product
+  Given an artisan owns a product with 4 items in stock
+  When the artisan adds 6 items
+  Then the stock becomes 10
 
-Scenario: إعادة تخزين تتجاوز السقف
-Given المنتج "مجسم خشبي منحوت" مخزونه "6"
-When طلب إضافة "496" قطعة
-Then يرفض النظام ويظهر "المخزون يتجاوز الحد الأقصى 500 قطعة"
+Scenario: Reject restocking above the stock limit
+  Given a product has 499 items in stock
+  When the artisan adds 2 items
+  Then the stock remains unchanged

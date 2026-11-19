@@ -15,30 +15,38 @@ public class CartService {
 
     public Outcome addItem(Cart cart, int productId, int qty) {
 <span class="fc" id="L17">        Product p = repo.product(productId);</span>
-<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (p == null) return Outcome.fail(&quot;المنتج غير موجود&quot;);</span>
-<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (qty &lt; 1) return Outcome.fail(&quot;الكمية يجب أن تكون رقماً موجباً&quot;);</span>
-<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (qty &gt; MAX_QTY_PER_PRODUCT) return Outcome.fail(&quot;الحد الأقصى 5 قطع من كل منتج في السلة&quot;);</span>
-<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (qty &gt; p.stock) return Outcome.fail(&quot;الكمية المطلوبة غير متوفرة حالياً&quot;);</span>
-<span class="fc" id="L22">        cart.put(productId, qty);</span>
-<span class="fc" id="L23">        return Outcome.ok(&quot;تمت إضافة &quot; + p.name + &quot; x&quot; + qty + &quot; إلى السلة&quot;);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (p == null) return Outcome.fail(&quot;Product not found.&quot;);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (qty &lt; 1) return Outcome.fail(&quot;Quantity must be positive.&quot;);</span>
+<span class="fc" id="L20">        int updatedQty = cart.qtyOf(productId) + qty;</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (updatedQty &gt; MAX_QTY_PER_PRODUCT) return Outcome.fail(&quot;You can add up to 5 pieces per product.&quot;);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (updatedQty &gt; p.stock) return Outcome.fail(&quot;Requested quantity is out of stock.&quot;);</span>
+<span class="fc" id="L23">        cart.set(productId, updatedQty);</span>
+<span class="fc" id="L24">        return Outcome.ok(&quot;Added &quot; + qty + &quot; of &quot; + p.name + &quot; to your cart.&quot;);</span>
     }
 
     public Outcome changeQty(Cart cart, int productId, int newQty) {
-<span class="fc" id="L27">        Product p = repo.product(productId);</span>
-<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (p == null) return Outcome.fail(&quot;المنتج غير موجود&quot;);</span>
-<span class="fc bfc" id="L29" title="All 4 branches covered.">        if (newQty &lt; 1 || newQty &gt; MAX_QTY_PER_PRODUCT) return Outcome.fail(&quot;الكمية المسموحة من 1 إلى 5&quot;);</span>
-<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (newQty &gt; p.stock) return Outcome.fail(&quot;الكمية المطلوبة غير متوفرة حالياً&quot;);</span>
-<span class="fc" id="L31">        cart.set(productId, newQty);</span>
-<span class="fc" id="L32">        return Outcome.ok(&quot;صارت كمية &quot; + p.name + &quot; في السلة &quot; + newQty);</span>
+<span class="fc" id="L28">        Product p = repo.product(productId);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (p == null) return Outcome.fail(&quot;Product not found.&quot;);</span>
+<span class="fc bfc" id="L30" title="All 4 branches covered.">        if (newQty &lt; 1 || newQty &gt; MAX_QTY_PER_PRODUCT) return Outcome.fail(&quot;Quantity must be from 1 to 5.&quot;);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (newQty &gt; p.stock) return Outcome.fail(&quot;Requested quantity is out of stock.&quot;);</span>
+<span class="fc" id="L32">        cart.set(productId, newQty);</span>
+<span class="fc" id="L33">        return Outcome.ok(&quot;Cart quantity for &quot; + p.name + &quot; is now &quot; + newQty + &quot;.&quot;);</span>
+    }
+
+    public Outcome removeItem(Cart cart, int productId) {
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (repo.product(productId) == null) return Outcome.fail(&quot;Product not found.&quot;);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (cart.qtyOf(productId) == 0) return Outcome.fail(&quot;Product is not in your cart.&quot;);</span>
+<span class="fc" id="L39">        cart.remove(productId);</span>
+<span class="fc" id="L40">        return Outcome.ok(&quot;Item removed from your cart.&quot;);</span>
     }
 
     public double total(Cart cart) {
-<span class="fc" id="L36">        double t = 0;</span>
-<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (var entry : cart.all().entrySet()) {</span>
-<span class="fc" id="L38">            Product p = repo.product(entry.getKey());</span>
-<span class="fc" id="L39">            t += p.price * entry.getValue();</span>
-<span class="fc" id="L40">        }</span>
-<span class="fc" id="L41">        return Math.round(t * 100.0) / 100.0;</span>
+<span class="fc" id="L44">        double t = 0;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (var entry : cart.all().entrySet()) {</span>
+<span class="fc" id="L46">            Product p = repo.product(entry.getKey());</span>
+<span class="fc" id="L47">            t += p.price * entry.getValue();</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        return Math.round(t * 100.0) / 100.0;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

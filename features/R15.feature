@@ -1,11 +1,11 @@
-Feature: شحن محفظة العميل
+Feature: Top up a wallet
 
-Scenario: عميل يشحن محفظته
-Given العميل "ريم الشوبكي" رصيد محفظتها "10" دنانير
-When طلب شحن "50" دينار
-Then يزيد النظام الرصيد إلى "60" ويظهر "تم شحن المحفظة، الرصيد الحالي 60.0 دينار"
+Scenario: Add a valid top-up
+  Given a customer wallet has a balance of 20 JOD
+  When the customer adds 25 JOD
+  Then the wallet balance becomes 45 JOD
 
-Scenario: شحن بمبلغ فوق السقف
-Given طلب شحن "1001" دينار
-When طلب الشحن
-Then يرفض النظام ويظهر "أقصى قيمة شحن هي 1000 دينار"
+Scenario: Reject an amount above the limit
+  Given a customer requests a top-up of 1001 JOD
+  When the top-up is processed
+  Then the wallet balance is unchanged

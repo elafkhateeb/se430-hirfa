@@ -16,12 +16,17 @@ public class OrderService {
     }
 
     public Outcome place(Customer customer, Cart cart, double distanceKm, String payment, String promoCode, LocalDateTime now) {
-        if (cart.isEmpty()) return Outcome.fail("السلة فارغة");
+        return place(customer, cart, distanceKm, payment, promoCode, null, now);
+    }
+
+    public Outcome place(Customer customer, Cart cart, double distanceKm, String payment,
+                         String promoCode, String cardNumber, LocalDateTime now) {
+        if (cart.isEmpty()) return Outcome.fail("Your cart is empty.");
+        if (!Double.isFinite(distanceKm) || distanceKm < 0) return Outcome.fail("Delivery distance must be zero or greater.");
         List<OrderItem> items = buildItems(cart);
-        if (items == null) return Outcome.fail("أحد المنتجات في السلة لم يعد متوفراً");
+        if (items == null) return Outcome.fail("A cart item is no longer available.");
         double subtotal = items.stream().mapToDouble(OrderItem::subtotal).sum();
-        if (subtotal < MIN_ORDER_TOTAL) return Outcome.fail("الحد الأدنى لقيمة الطلب 5 دنانير");
-        if (!validMethod(payment)) return Outcome.fail("طريقة الدفع غير معتمدة");
+        if (subtotal < MIN_ORDER_TOTAL) return Outcome.fail("Orders must total at least 5 JOD.");
 
         DiscountCalculator discountCalc = new DiscountCalculator();
         Outcome promo = discountCalc.apply(promoCode, subtotal);
@@ -33,9 +38,8 @@ public class OrderService {
         double discount = round(promo.value() + subtotal * tier.discountPercent() / 100.0);
         double total = round(subtotal - discount + fee);
 
-        if (payment.equals("WALLET") && customer.wallet < total) {
-            return Outcome.fail("الرصيد في المحفظة غير كافٍ");
-        }
+        Outcome paymentResult = new PaymentService().pay(payment, total, customer.wallet, cardNumber);
+        if (!paymentResult.ok()) return paymentResult;
 
         for (OrderItem it : items) {
             Product p = repo.product(it.productId());
@@ -50,7 +54,7 @@ public class OrderService {
         customer.ordersCount++;
         if (payment.equals("WALLET")) customer.wallet = round(customer.wallet - total);
         repo.saveCustomer(customer);
-        return new Outcome(true, "تم إنشاء الطلب رقم " + orderId + " بقيمة " + total + " دينار", orderId);
+        return new Outcome(true, "Order #" + orderId + " created — total " + total + " JOD.", orderId);
     }
 
     private List<OrderItem> buildItems(Cart cart) {
@@ -61,10 +65,6 @@ public class OrderService {
             items.add(new OrderItem(p.id, p.name, p.price, e.getValue()));
         }
         return items;
-    }
-
-    private boolean validMethod(String method) {
-        return method != null && (method.equals("CASH") || method.equals("CARD") || method.equals("WALLET"));
     }
 
     private double round(double v) {

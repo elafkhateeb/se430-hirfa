@@ -3,10 +3,10 @@
 <span class="fc" id="L3">public class LoyaltyService {</span>
 
     public Tier tierFor(int ordersCount) {
-<span class="fc bfc" id="L6" title="All 2 branches covered.">        if (ordersCount &gt;= 30) return new Tier(&quot;الماسي&quot;, 15);</span>
-<span class="fc bfc" id="L7" title="All 2 branches covered.">        if (ordersCount &gt;= 15) return new Tier(&quot;الذهبي&quot;, 10);</span>
-<span class="fc bfc" id="L8" title="All 2 branches covered.">        if (ordersCount &gt;= 5) return new Tier(&quot;الفضي&quot;, 5);</span>
-<span class="fc" id="L9">        return new Tier(&quot;البرونزي&quot;, 0);</span>
+<span class="fc bfc" id="L6" title="All 2 branches covered.">        if (ordersCount &gt;= 30) return new Tier(&quot;Diamond&quot;, 15);</span>
+<span class="fc bfc" id="L7" title="All 2 branches covered.">        if (ordersCount &gt;= 15) return new Tier(&quot;Gold&quot;, 10);</span>
+<span class="fc bfc" id="L8" title="All 2 branches covered.">        if (ordersCount &gt;= 5) return new Tier(&quot;Silver&quot;, 5);</span>
+<span class="fc" id="L9">        return new Tier(&quot;Bronze&quot;, 0);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,16 +1,12 @@
-Feature: إلغاء طلب بحالة «جديد»
+Feature: Cancel an order
 
-Scenario: عميل يلغي طلباً خلال ساعتين
-Given طلب إنشئ قبل "119" دقيقة بحالة "جديد"
-When طلب الإلغاء
-Then يلغي النظام الطلب ويظهر "تم إلغاء الطلب"
+Scenario: Cancel a new order within two hours
+  Given an order is new and was placed 30 minutes ago
+  When the customer cancels the order
+  Then the order is cancelled
+  And any wallet-funded amount is refunded
 
-Scenario: عميل يحاول الإلغاء بعد ساعتين
-Given طلب إنشئ قبل "121" دقيقة
-When طلب الإلغاء
-Then يرفض النظام ويظهر "انتهت مدة الإلغاء (ساعتان)"
-
-Scenario: إلغاء طلب مدفوع بالمحفظة
-Given طلب الدفع "WALLET" بقيمة "9.0" دنانير
-When طلب الإلغاء خلال الدقيقة "30"
-Then يلغي النظام الطلب ويسترد المبلغ ويظهر "تم إلغاء الطلب واسترداد 9.0 دينار إلى المحفظة"
+Scenario: Reject cancellation after two hours
+  Given an order was placed more than two hours ago
+  When the customer cancels the order
+  Then the order remains unchanged

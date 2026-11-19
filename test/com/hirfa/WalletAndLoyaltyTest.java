@@ -25,7 +25,8 @@ public class WalletAndLoyaltyTest {
         repo = new Repo(":memory:");
         repo.seed();
         wallet = new WalletService(repo);
-        customerId = repo.customerByEmail("reem@gmail.com").id;
+        customerId = repo.insertCustomer(new Customer(0, "Test Wallet Customer", "0787654321",
+                "wallet@example.com", "WalletPass2026", 10, 0));
     }
 
     private Customer customer() {
@@ -43,7 +44,7 @@ public class WalletAndLoyaltyTest {
     void topUp_belowOne_rejected() {
         Outcome out = wallet.topUp(customer(), 0.99);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("دينار واحد"));
+        assertTrue(out.message().contains("1 JOD"));
     }
 
     @Test
@@ -61,14 +62,14 @@ public class WalletAndLoyaltyTest {
 
     @ParameterizedTest
     @CsvSource({
-            "0, البرونزي, 0",
-            "4, البرونزي, 0",
-            "5, الفضي, 5",
-            "14, الفضي, 5",
-            "15, الذهبي, 10",
-            "29, الذهبي, 10",
-            "30, الماسي, 15",
-            "99, الماسي, 15"
+            "0, Bronze, 0",
+            "4, Bronze, 0",
+            "5, Silver, 5",
+            "14, Silver, 5",
+            "15, Gold, 10",
+            "29, Gold, 10",
+            "30, Diamond, 15",
+            "99, Diamond, 15"
     })
     void tierFor_boundaries(int orders, String name, double percent) {
         Tier tier = loyalty.tierFor(orders);

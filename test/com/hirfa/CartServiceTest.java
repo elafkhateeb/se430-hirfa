@@ -37,31 +37,39 @@ public class CartServiceTest {
     }
 
     @Test
+    void addItem_rejectsTotalAbovePerItemLimit() {
+        service.addItem(cart, 3, 2);
+        Outcome result = service.addItem(cart, 3, 4);
+        assertFalse(result.ok());
+        assertEquals(2, cart.qtyOf(3));
+    }
+
+    @Test
     void addItem_unknownProduct_rejected() {
         Outcome out = service.addItem(cart, 99, 1);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("غير موجود"));
+        assertTrue(out.message().contains("not found"));
     }
 
     @Test
     void addItem_zeroQty_rejected() {
         Outcome out = service.addItem(cart, 3, 0);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("موجباً"));
+        assertTrue(out.message().contains("positive"));
     }
 
     @Test
     void addItem_sixUnits_rejected() {
         Outcome out = service.addItem(cart, 3, 6);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("الحد الأقصى 5"));
+        assertTrue(out.message().contains("up to 5"));
     }
 
     @Test
     void addItem_outOfStockProduct_rejected() {
         Outcome out = service.addItem(cart, 4, 1);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("غير متوفرة"));
+        assertTrue(out.message().contains("out of stock"));
     }
 
     @Test

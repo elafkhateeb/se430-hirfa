@@ -1,11 +1,11 @@
-Feature: مستوى ولاء العميل
+Feature: Calculate customer loyalty tier
 
-Scenario: عميل أتم 5 طلبات
-Given العميل "أمل الخطيب" أتم "5" طلبات ناجحة
-When السؤال عن المستوى
-Then المستوى "الفضي" بخصم تلقائي "5%"
+Scenario: Qualify for a higher tier
+  Given a customer has completed enough orders for the next tier
+  When the loyalty tier is calculated
+  Then the customer receives the matching tier and discount
 
-Scenario: عميل أتم 30 طلباً
-Given العميل أتم "30" طلباً ناجحاً
-When السؤال عن المستوى
-Then المستوى "الماسي" بخصم تلقائي "15%"
+Scenario: Keep the base tier below the threshold
+  Given a customer has fewer completed orders than the first threshold
+  When the loyalty tier is calculated
+  Then the customer remains in the base tier

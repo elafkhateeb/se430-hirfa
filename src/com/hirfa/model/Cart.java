@@ -1,6 +1,5 @@
 package com.hirfa.model;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -13,6 +12,10 @@ public class Cart {
 
     public void set(int productId, int qty) {
         quantities.put(productId, qty);
+    }
+
+    public void remove(int productId) {
+        quantities.remove(productId);
     }
 
     public int qtyOf(int productId) {

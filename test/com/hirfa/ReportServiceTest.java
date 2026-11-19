@@ -1,6 +1,7 @@
 package com.hirfa;
 
 import com.hirfa.model.Cart;
+import com.hirfa.model.Customer;
 import com.hirfa.model.Product;
 import com.hirfa.repo.Repo;
 import com.hirfa.service.OrderService;
@@ -21,6 +22,10 @@ public class ReportServiceTest {
     void setUp() {
         repo = new Repo(":memory:");
         repo.seed();
+        repo.insertCustomer(new Customer(0, "Test Customer One", "0791234567",
+                "one@example.com", "CustomerPass2026", 100, 0));
+        repo.insertCustomer(new Customer(0, "Test Customer Two", "0787654321",
+                "two@example.com", "CustomerPass2026", 100, 0));
         report = new ReportService(repo);
         orders = new OrderService(repo);
         from = LocalDateTime.of(2026, 11, 1, 0, 0);
@@ -44,14 +49,14 @@ public class ReportServiceTest {
         ReportService.ArtisanReport out = report.artisanReport(1, from, to);
         assertEquals(0, out.revenue(), 0.001);
         assertEquals(0, out.ordersCount());
-        assertEquals("لا توجد طلبات ضمن الفترة المحددة", out.message());
+        assertEquals("No orders were found in the selected period.", out.message());
     }
 
     @Test
     void artisanReport_reversedPeriod_rejected() {
         ReportService.ArtisanReport out = report.artisanReport(1, to, from);
         assertEquals(0, out.revenue(), 0.001);
-        assertEquals("الفترة غير صحيحة", out.message());
+        assertEquals("Invalid report period.", out.message());
     }
 
     @Test

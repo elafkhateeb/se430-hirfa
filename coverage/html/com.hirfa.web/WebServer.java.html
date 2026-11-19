@@ -1,0 +1,836 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebServer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">com.hirfa.web</a> &gt; <span class="el_source">WebServer.java</span></div><h1>WebServer.java</h1><pre class="source lang-java linenums">package com.hirfa.web;
+
+import com.hirfa.model.*;
+import com.hirfa.repo.Repo;
+import com.hirfa.service.*;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class WebServer {
+    private final Repo repo;
+    private final CustomerService customerService;
+    private final ArtisanService artisanService;
+    private final ProductService productService;
+    private final CartService cartService;
+    private final OrderService orderService;
+    private final OrderLifecycleService orderLifecycleService;
+    private final WalletService walletService;
+    private final ReportService reportService;
+<span class="fc" id="L29">    private final EtaCalculator eta = new EtaCalculator();</span>
+
+<span class="fc" id="L31">    private final Map&lt;String, Session&gt; sessions = new ConcurrentHashMap&lt;&gt;();</span>
+    private static final String COOKIE = &quot;hirfa_sid&quot;;
+    private HttpServer server;
+
+<span class="fc" id="L35">    private static class Session {</span>
+        Customer user;
+        Artisan artisan;
+<span class="fc" id="L38">        Cart cart = new Cart();</span>
+    }
+
+<span class="fc" id="L41">    public WebServer(Repo repo) {</span>
+<span class="fc" id="L42">        this.repo = repo;</span>
+<span class="fc" id="L43">        this.customerService = new CustomerService(repo);</span>
+<span class="fc" id="L44">        this.artisanService = new ArtisanService(repo);</span>
+<span class="fc" id="L45">        this.productService = new ProductService(repo);</span>
+<span class="fc" id="L46">        this.cartService = new CartService(repo);</span>
+<span class="fc" id="L47">        this.orderService = new OrderService(repo);</span>
+<span class="fc" id="L48">        this.orderLifecycleService = new OrderLifecycleService();</span>
+<span class="fc" id="L49">        this.walletService = new WalletService(repo);</span>
+<span class="fc" id="L50">        this.reportService = new ReportService(repo);</span>
+<span class="fc" id="L51">    }</span>
+
+    public void start(int port) throws IOException {
+<span class="fc" id="L54">        server = HttpServer.create(new InetSocketAddress(port), 0);</span>
+<span class="fc" id="L55">        server.createContext(&quot;/&quot;, this::route);</span>
+<span class="fc" id="L56">        server.start();</span>
+<span class="fc" id="L57">        System.out.println(&quot;Hirfa platform started: http://localhost:&quot; + server.getAddress().getPort());</span>
+<span class="fc" id="L58">    }</span>
+
+    public int port() {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (server == null) throw new IllegalStateException(&quot;Server has not been started.&quot;);</span>
+<span class="fc" id="L62">        return server.getAddress().getPort();</span>
+    }
+
+    public void close() {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (server != null) {</span>
+<span class="fc" id="L67">            server.stop(0);</span>
+<span class="fc" id="L68">            server = null;</span>
+        }
+<span class="fc" id="L70">    }</span>
+
+    private void route(com.sun.net.httpserver.HttpExchange ex) throws IOException {
+<span class="fc" id="L73">        String path = ex.getRequestURI().getPath();</span>
+<span class="fc" id="L74">        boolean post = ex.getRequestMethod().equals(&quot;POST&quot;);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        String body = post ? new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8) : &quot;&quot;;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        String query = body.isEmpty() ? ex.getRequestURI().getRawQuery() : body;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        var params = parse(query == null ? &quot;&quot; : query);</span>
+<span class="fc" id="L78">        String sid = sid(ex);</span>
+<span class="fc" id="L79">        Session s = sessions.computeIfAbsent(sid, k -&gt; new Session());</span>
+<span class="fc" id="L80">        String cookieOld = existingCookie(ex);</span>
+
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (path.equals(&quot;/logout&quot;)) {</span>
+<span class="nc" id="L83">            sessions.remove(sid);</span>
+<span class="nc" id="L84">            redirect(ex, COOKIE + &quot;=; Path=/; Max-Age=0&quot;, &quot;/&quot;);</span>
+<span class="nc" id="L85">            return;</span>
+        }
+
+        String page;
+<span class="fc" id="L89">        int status = 200;</span>
+        try {
+<span class="pc bpc" id="L91" title="4 of 11 branches missed.">            switch (path) {</span>
+<span class="fc" id="L92">                case &quot;/&quot;, &quot;/products&quot; -&gt; page = products(params.get(&quot;craft&quot;), params.get(&quot;max&quot;), s);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                case &quot;/artisan&quot; -&gt; page = post ? doRateArtisan(params.get(&quot;id&quot;), params.get(&quot;stars&quot;), s)</span>
+<span class="nc" id="L94">                        : artisanPage(params.get(&quot;id&quot;), s);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                case &quot;/artisan/dashboard&quot; -&gt; page = post ? artisanDashboardSubmit(params, s) : artisanDashboard(s);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                case &quot;/register&quot; -&gt; page = post ? doRegister(params, s) : registerPage(null, s);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                case &quot;/login&quot; -&gt; page = post ? doLogin(params, s) : loginPage(null, s);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                case &quot;/cart&quot; -&gt; page = post ? cartServiceSubmit(params, s) : cartPage(null, s);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                case &quot;/order&quot; -&gt; page = post ? doOrder(params, s) : checkoutPage(null, s);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                case &quot;/wallet&quot; -&gt; page = post ? doWallet(params, s) : walletPage(null, s);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                case &quot;/orders&quot; -&gt; page = post ? cancelOrder(params, s) : ordersPage(s);</span>
+<span class="nc" id="L102">                case &quot;/admin&quot; -&gt; page = adminPage(params.get(&quot;id&quot;), params.get(&quot;from&quot;), params.get(&quot;to&quot;), s);</span>
+<span class="nc" id="L103">                default -&gt; page = notFound(s);</span>
+            }
+<span class="nc" id="L105">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L106">            page = header(&quot;Invalid request&quot;, &quot;&quot;, s)</span>
+<span class="nc" id="L107">                    + note(&quot;Enter valid numeric values and try again.&quot;, false) + footer();</span>
+<span class="nc" id="L108">            status = 400;</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        byte[] bytes = page.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (!sid.equals(cookieOld)) ex.getResponseHeaders().add(&quot;Set-Cookie&quot;, COOKIE + &quot;=&quot; + sid + &quot;; Path=/; HttpOnly&quot;);</span>
+<span class="fc" id="L112">        ex.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;text/html; charset=utf-8&quot;);</span>
+<span class="fc" id="L113">        ex.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L114">        try (OutputStream os = ex.getResponseBody()) {</span>
+<span class="fc" id="L115">            os.write(bytes);</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+    private void redirect(com.sun.net.httpserver.HttpExchange ex, String cookie, String to) throws IOException {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (cookie != null) ex.getResponseHeaders().add(&quot;Set-Cookie&quot;, cookie);</span>
+<span class="nc" id="L121">        ex.getResponseHeaders().set(&quot;Location&quot;, to);</span>
+<span class="nc" id="L122">        ex.sendResponseHeaders(302, -1);</span>
+<span class="nc" id="L123">    }</span>
+
+    private String sid(com.sun.net.httpserver.HttpExchange ex) {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        return existingCookie(ex).isEmpty() ? UUID.randomUUID().toString() : existingCookie(ex);</span>
+    }
+
+    private String existingCookie(com.sun.net.httpserver.HttpExchange ex) {
+<span class="fc" id="L130">        String c = ex.getRequestHeaders().getFirst(&quot;Cookie&quot;);</span>
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">        if (c != null) for (String part : c.split(&quot;;&quot;)) {</span>
+<span class="fc" id="L132">            String[] kv = part.trim().split(&quot;=&quot;, 2);</span>
+<span class="pc bpc" id="L133" title="2 of 4 branches missed.">            if (kv.length == 2 &amp;&amp; kv[0].equals(COOKIE)) return kv[1];</span>
+        }
+<span class="fc" id="L135">        return &quot;&quot;;</span>
+    }
+
+<span class="fc" id="L138">    private static final List&lt;String&gt; CRAFTS = List.of(&quot;Embroidery&quot;, &quot;Soap&quot;, &quot;Woodwork&quot;, &quot;Leather&quot;, &quot;Ceramics&quot;, &quot;Jewelry&quot;);</span>
+
+    private String craftEN(String craft) {
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        return craft == null ? &quot;&quot; : craft;</span>
+    }
+
+    private String nameEN(String name) {
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        return name == null ? &quot;&quot; : name;</span>
+    }
+
+    private String productEN(String name) {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        return name == null ? &quot;&quot; : name;</span>
+    }
+
+    private String craftValue(String label) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (label == null) return &quot;&quot;;</span>
+<span class="fc" id="L154">        return CRAFTS.stream().filter(craft -&gt; craft.equalsIgnoreCase(label.trim()))</span>
+<span class="fc" id="L155">                .findFirst().orElse(label.trim());</span>
+    }
+
+    private String promoValue(String input) {
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        return input == null ? &quot;&quot; : input.trim().replace(&quot; &quot;, &quot;&quot;).toUpperCase();</span>
+    }
+
+    private String t(String message) {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        return message == null ? &quot;&quot; : message;</span>
+    }
+
+    /* ---------- pages ---------- */
+
+    private static final String CSS = &quot;&quot;&quot;
+            *{box-sizing:border-box}
+            body{margin:0;background:#faf7f1;color:#33291c;font-family:'Segoe UI',Tahoma,sans-serif;line-height:1.6}
+            header{background:#5d4116;color:#f5ecd9;padding:0}
+            .head{max-width:1000px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:12px 20px 0}
+            .brand{font-size:1.25rem;font-weight:700;letter-spacing:.4px;text-decoration:none;color:#fff}
+            .brand small{display:block;font-size:.62rem;font-weight:400;color:#cdb190}
+            .who{display:flex;align-items:center;gap:8px;font-size:.9rem;color:#e8d9bb}
+            .who .chip{background:rgba(255,255,255,.15);border-radius:99px;padding:2px 10px;color:#fff}
+            nav{max-width:1000px;margin:0 auto;display:flex;flex-wrap:wrap;gap:4px;padding:10px 20px}
+            nav a{color:#e8d9bb;text-decoration:none;padding:6px 12px;border-radius:8px;font-size:.92rem}
+            nav a:hover{background:rgba(255,255,255,.14)}
+            nav a.active{background:#8a5a00;color:#fff}
+            main{max-width:1000px;margin:0 auto;padding:24px 16px 40px}
+            h2{color:#5d4116;margin:0 0 4px;font-size:1.4rem}
+            .sub{color:#8a7a63;font-size:.93rem;margin:0 0 18px}
+            .card{background:#fff;border:1px solid #e4d8c2;border-radius:12px;padding:18px;margin-bottom:16px}
+            .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+            label{display:block;font-size:.84rem;color:#8a7a63;font-weight:600;margin-bottom:4px}
+            input,select{font:inherit;padding:8px 10px;border:1px solid #d3c5a8;border-radius:8px;background:#fff;color:#33291c}
+            input:focus,select:focus{outline:2px solid #c9a24b}
+            button{font:inherit;font-weight:700;padding:9px 16px;border:0;border-radius:8px;cursor:pointer;background:#8a5a00;color:#fff}
+            button:hover{background:#6b3f00}
+            button:disabled{background:#b9a98c;cursor:not-allowed}
+            a.btn{display:inline-block;background:#fff;border:1px solid #8a5a00;color:#5d4116;padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.92rem}
+            a.btn:hover{background:#f7efe0}
+            .ok{background:#e6f4ea;color:#0a7d32;border:1px solid #bfe4c8;padding:10px 14px;border-radius:8px;margin:0 0 14px;font-weight:600}
+            .err{background:#fdecea;color:#b3261e;border:1px solid #f0c4bf;padding:10px 14px;border-radius:8px;margin:0 0 14px;font-weight:600}
+            .hint{background:#f6efe1;border:1px dashed #d3c5a8;color:#8a7a63;border-radius:8px;padding:10px 14px;font-size:.9rem}
+            .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+            .product{display:flex;flex-direction:column;gap:8px}
+            .product h3{margin:0;font-size:1.02rem}
+            .tag{display:inline-block;background:#e9f2ec;color:#125e38;border-radius:99px;padding:2px 10px;font-size:.78rem}
+            .muted{color:#8a7a63;font-size:.88rem}
+            .stock{color:#8a7a63;font-size:.85rem}
+            .stock.out{color:#b3261e;font-weight:600}
+            .price{font-weight:700;color:#125e38;font-size:1.12rem}
+            .buy{display:flex;gap:8px;align-items:center;margin-top:auto;padding-top:8px;border-top:1px solid #f0e6d2}
+            .buy input{width:52px}
+            .table-wrap{overflow-x:auto}
+            table{border-collapse:collapse;width:100%;background:#fff}
+            th,td{padding:9px 12px;text-align:left;border-bottom:1px solid #eee2cc}
+            th{background:#f4ead7;color:#5d4116;font-size:.88rem}
+            .total{font-weight:700;background:#faf3e4}
+            .balance{font-size:2rem;font-weight:800;color:#125e38;text-align:center;margin:6px 0 2px}
+            .center{text-align:center;padding:36px 18px}
+            footer{max-width:1000px;margin:0 auto;padding:0 16px 24px;color:#8a7a63;font-size:.84rem;text-align:center}
+            @media(max-width:640px){.head{flex-direction:column;align-items:center}nav{justify-content:center}}
+            &quot;&quot;&quot;;
+
+    private String header(String title, String path, Session s) {
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        boolean customer = s.user != null;</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        boolean artisan = s.artisan != null;</span>
+        String[][] links;
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (customer) links = new String[][]{{&quot;Products&quot;, &quot;/products&quot;}, {&quot;Cart&quot;, &quot;/cart&quot;}, {&quot;Checkout&quot;, &quot;/order&quot;},</span>
+                {&quot;Wallet&quot;, &quot;/wallet&quot;}, {&quot;My Orders&quot;, &quot;/orders&quot;}, {&quot;Artisans&quot;, &quot;/artisan&quot;}};
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        else if (artisan) links = new String[][]{{&quot;Products&quot;, &quot;/products&quot;},</span>
+                {&quot;Artisan dashboard&quot;, &quot;/artisan/dashboard&quot;}, {&quot;My profile&quot;, &quot;/artisan?id=&quot; + s.artisan.id}};
+<span class="nc" id="L226">        else links = new String[][]{{&quot;Products&quot;, &quot;/products&quot;}, {&quot;Cart&quot;, &quot;/cart&quot;}, {&quot;Artisans&quot;, &quot;/artisan&quot;},</span>
+                {&quot;Register&quot;, &quot;/register&quot;}, {&quot;Login&quot;, &quot;/login&quot;}};
+<span class="fc" id="L228">        StringBuilder nav = new StringBuilder();</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        for (String[] l : links) {</span>
+<span class="pc bpc" id="L230" title="1 of 8 branches missed.">            boolean active = (l[1].equals(&quot;/products&quot;) &amp;&amp; (path.equals(&quot;/&quot;) || path.equals(&quot;/products&quot;))) || l[1].equals(path);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            nav.append(&quot;&lt;a href='&quot;).append(l[1]).append(&quot;'&quot;).append(active ? &quot; class='active'&quot; : &quot;&quot;).append(&quot;&gt;&quot;)</span>
+<span class="fc" id="L232">                    .append(l[0]).append(&quot;&lt;/a&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        String who = customer</span>
+<span class="fc" id="L235">                ? &quot;&lt;span class='chip'&gt;&quot; + escapeHtml(nameEN(s.user.name)) + &quot; · &quot;</span>
+<span class="fc" id="L236">                + String.format(&quot;%.2f JOD&quot;, repo.customer(s.user.id).wallet) + &quot;&lt;/span&gt;&quot;</span>
+                + &quot;&lt;a class='btn' href='/logout'&gt;Log out&lt;/a&gt;&quot;
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                : artisan</span>
+<span class="fc" id="L239">                ? &quot;&lt;span class='chip'&gt;&quot; + escapeHtml(nameEN(s.artisan.name)) + &quot; · Artisan&lt;/span&gt;&quot;</span>
+                + &quot;&lt;a class='btn' href='/logout'&gt;Log out&lt;/a&gt;&quot;
+<span class="pc" id="L241">                : &quot;&quot;;</span>
+<span class="fc" id="L242">        return (&quot;&lt;!DOCTYPE html&gt;&lt;html lang='en'&gt;&lt;head&gt;&lt;meta charset='utf-8'&gt;&quot;</span>
+                + &quot;&lt;meta name='viewport' content='width=device-width, initial-scale=1'&gt;&quot;
+                + &quot;&lt;title&gt;Hirfa — &quot; + title + &quot;&lt;/title&gt;&lt;style&gt;&quot; + CSS + &quot;&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&quot;
+                + &quot;&lt;header&gt;&lt;div class='head'&gt;&quot;
+                + &quot;&lt;a class='brand' href='/'&gt;Hirfa&lt;small&gt;handmade delivery platform&lt;/small&gt;&lt;/a&gt;&quot;
+                + &quot;&lt;div class='who'&gt;&quot; + who + &quot;&lt;/div&gt;&lt;/div&gt;&lt;nav&gt;&quot; + nav + &quot;&lt;/nav&gt;&lt;/header&gt;&quot;
+                + &quot;&lt;main&gt;&lt;h2&gt;&quot; + title + &quot;&lt;/h2&gt;&quot;);
+    }
+
+    private String footer() {
+<span class="fc" id="L252">        return &quot;&lt;/main&gt;&lt;footer&gt;Hirfa — handmade delivery platform · SE430 Software Testing Project 2026&lt;/footer&gt;&lt;/body&gt;&lt;/html&gt;&quot;;</span>
+    }
+
+    private String note(String enMessage, boolean ok) {
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        return &quot;&lt;p class='&quot; + (ok ? &quot;ok&quot; : &quot;err&quot;) + &quot;'&gt;&quot; + escapeHtml(enMessage) + &quot;&lt;/p&gt;&quot;;</span>
+    }
+
+    private String escapeHtml(String value) {
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        if (value == null) return &quot;&quot;;</span>
+<span class="fc" id="L261">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;)</span>
+<span class="fc" id="L262">                .replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;).replace(&quot;'&quot;, &quot;&amp;#39;&quot;);</span>
+    }
+
+    /* products */
+
+    private String products(String craftParam, String max, Session s) {
+<span class="pc bpc" id="L268" title="3 of 4 branches missed.">        String craft = (craftParam == null || craftParam.isBlank()) ? null : craftValue(craftParam);</span>
+<span class="pc bpc" id="L269" title="3 of 4 branches missed.">        Double maxPrice = (max == null || max.isBlank()) ? null : Double.valueOf(max);</span>
+<span class="fc" id="L270">        List&lt;Product&gt; list = productService.search(craft, maxPrice);</span>
+<span class="fc" id="L271">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L272">        sb.append(header(&quot;Products&quot;, &quot;/products&quot;, s));</span>
+<span class="fc" id="L273">        sb.append(&quot;&lt;p class='sub'&gt;Handmade work from Jordanian artisans&lt;/p&gt;&quot;);</span>
+<span class="fc" id="L274">        StringBuilder opts = new StringBuilder(&quot;&lt;option value=''&gt;All crafts&lt;/option&gt;&quot;);</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        for (String c : CRAFTS) {</span>
+<span class="fc" id="L276">            String label = c;</span>
+<span class="fc" id="L277">            boolean chosen = label.equalsIgnoreCase(craftParam);</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            opts.append(&quot;&lt;option value='&quot;).append(label).append(&quot;'&quot;).append(chosen ? &quot; selected&quot; : &quot;&quot;).append(&quot;&gt;&quot;)</span>
+<span class="fc" id="L279">                    .append(label).append(&quot;&lt;/option&gt;&quot;);</span>
+<span class="fc" id="L280">        }</span>
+<span class="fc" id="L281">        sb.append(&quot;&quot;&quot;</span>
+                &lt;div class='card'&gt;&lt;form method='get' action='/products' class='row'&gt;
+                &lt;div&gt;&lt;label&gt;Craft&lt;/label&gt;&lt;select name='craft'&gt;%s&lt;/select&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Max price (JOD)&lt;/label&gt;&lt;input name='max' value='%s' size='6'&gt;&lt;/div&gt;
+                &lt;button&gt;Search&lt;/button&gt; &lt;a class='btn' href='/products'&gt;Show all&lt;/a&gt;
+                &lt;/form&gt;&lt;/div&gt;
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                &quot;&quot;&quot;.formatted(opts, escapeHtml(max == null ? &quot;&quot; : max)));</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (list.isEmpty()) {</span>
+<span class="nc" id="L289">            sb.append(&quot;&lt;div class='card center'&gt;No products match your search.&lt;/div&gt;&quot;);</span>
+        } else {
+<span class="fc" id="L291">            sb.append(&quot;&lt;div class='grid'&gt;&quot;);</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            for (Product p : list) {</span>
+<span class="fc" id="L293">                Artisan artisan = repo.artisan(p.artisanId);</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">                String artisanName = artisan == null ? &quot;Artisan&quot; : nameEN(artisan.name);</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">                String stock = p.stock &lt;= 0 ? &quot;&lt;span class='stock out'&gt;Out of stock&lt;/span&gt;&quot;</span>
+<span class="fc" id="L296">                        : &quot;&lt;span class='stock'&gt;&quot; + p.stock + &quot; in stock&lt;/span&gt;&quot;;</span>
+<span class="fc" id="L297">                sb.append(&quot;&quot;&quot;</span>
+                        &lt;div class='card product'&gt;
+                        &lt;h3&gt;%s&lt;/h3&gt;
+                        &lt;span class='tag'&gt;%s&lt;/span&gt; &lt;a class='muted' href='/artisan?id=%d'&gt;by %s&lt;/a&gt;
+                        &lt;div&gt;&lt;span class='price'&gt;%.2f JOD&lt;/span&gt; — %s&lt;/div&gt;
+                        &lt;form method='post' action='/cart' class='buy'&gt;
+                        &lt;input type='hidden' name='productId' value='%d'&gt;
+                        &lt;label style='margin:0'&gt;Qty&lt;/label&gt;&lt;input name='qty' value='1'&gt;
+                        &lt;button %s&gt;Add to cart&lt;/button&gt;
+                        &lt;/form&gt;&lt;/div&gt;
+<span class="fc" id="L307">                        &quot;&quot;&quot;.formatted(escapeHtml(productEN(p.name)), escapeHtml(craftEN(p.craft)),</span>
+<span class="fc" id="L308">                        p.artisanId, escapeHtml(artisanName), p.price, stock,</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">                        p.id, p.stock &lt;= 0 ? &quot;disabled&quot; : &quot;&quot;));</span>
+<span class="fc" id="L310">            }</span>
+<span class="fc" id="L311">            sb.append(&quot;&lt;/div&gt;&quot;);</span>
+        }
+<span class="fc" id="L313">        return sb.toString() + footer();</span>
+    }
+
+    /* artisan profile + rating */
+
+    private String artisanPage(String idParam, Session s) {
+<span class="nc" id="L319">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L320">        sb.append(header(&quot;Artisan profile&quot;, &quot;&quot;, s));</span>
+<span class="nc bnc" id="L321" title="All 4 branches missed.">        if (idParam == null || idParam.isBlank()) {</span>
+<span class="nc" id="L322">            sb.append(&quot;&lt;p class='sub'&gt;Choose an artisan to see profile, products and rating&lt;/p&gt;&lt;div class='card row'&gt;&quot;);</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            for (Artisan a : repo.artisans())</span>
+<span class="nc" id="L324">                sb.append(&quot;&lt;a class='btn' href='/artisan?id=%d'&gt;%s (%s)&lt;/a&gt;&quot;</span>
+<span class="nc" id="L325">                        .formatted(a.id, escapeHtml(nameEN(a.name)), escapeHtml(craftEN(a.craft))));</span>
+<span class="nc" id="L326">            sb.append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="nc" id="L327">            return sb.toString() + footer();</span>
+        }
+<span class="nc" id="L329">        int aid = Integer.parseInt(idParam);</span>
+<span class="nc" id="L330">        Artisan a = repo.artisan(aid);</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        if (a == null) {</span>
+<span class="nc" id="L332">            sb.append(note(&quot;Artisan not found.&quot;, false));</span>
+<span class="nc" id="L333">            return sb.toString() + footer();</span>
+        }
+<span class="nc" id="L335">        sb.append(&quot;&lt;p class='sub'&gt;&quot;).append(escapeHtml(nameEN(a.name))).append(&quot; — &quot;)</span>
+<span class="nc" id="L336">                .append(escapeHtml(craftEN(a.craft))).append(&quot;&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L337">        sb.append(&quot;&quot;&quot;</span>
+                &lt;div class='card row'&gt;
+                &lt;div&gt;&lt;div class='balance'&gt;%.1f &lt;small style='font-size:.9rem;color:#8a7a63'&gt;/ 5&lt;/small&gt;&lt;/div&gt;
+                &lt;div class='sub' style='margin:0'&gt;average rating&lt;/div&gt;&lt;/div&gt;
+                &lt;/div&gt;
+<span class="nc" id="L342">                &quot;&quot;&quot;.formatted(a.rating()));</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (s.user != null) {</span>
+<span class="nc" id="L344">            sb.append(&quot;&quot;&quot;</span>
+                    &lt;div class='card'&gt;&lt;h3 style='margin:0 0 10px;font-size:1.05rem'&gt;Rate this artisan&lt;/h3&gt;
+                    &lt;form method='post' action='/artisan' class='row'&gt;
+                    &lt;input type='hidden' name='id' value='%d'&gt;
+                    &lt;div&gt;&lt;label&gt;Your rating&lt;/label&gt;&lt;select name='stars'&gt;
+                    &lt;option value='1'&gt;1 — poor&lt;/option&gt;&lt;option value='2'&gt;2 — fair&lt;/option&gt;
+                    &lt;option value='3'&gt;3 — good&lt;/option&gt;&lt;option value='4'&gt;4 — very good&lt;/option&gt;
+                    &lt;option value='5'&gt;5 — excellent&lt;/option&gt;&lt;/select&gt;&lt;/div&gt;
+                    &lt;button&gt;Submit rating&lt;/button&gt;
+                    &lt;/form&gt;&lt;/div&gt;
+<span class="nc" id="L354">                    &quot;&quot;&quot;.formatted(aid));</span>
+        } else {
+<span class="nc" id="L356">            sb.append(&quot;&lt;div class='hint'&gt;Log in to rate this artisan.&lt;/div&gt;&quot;);</span>
+        }
+<span class="nc" id="L358">        sb.append(&quot;&lt;h3 style='margin:16px 0 10px;font-size:1.08rem'&gt;Products&lt;/h3&gt;&lt;div class='grid'&gt;&quot;);</span>
+<span class="nc" id="L359">        boolean any = false;</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">        for (Product p : repo.products()) {</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">            if (p.artisanId != aid) continue;</span>
+<span class="nc" id="L362">            any = true;</span>
+<span class="nc" id="L363">            sb.append(&quot;&quot;&quot;</span>
+                    &lt;div class='card product'&gt;
+                    &lt;h3&gt;%s&lt;/h3&gt;&lt;span class='tag'&gt;%s&lt;/span&gt;
+                    &lt;div&gt;&lt;span class='price'&gt;%.2f JOD&lt;/span&gt; — &lt;span class='stock'&gt;%d in stock&lt;/span&gt;&lt;/div&gt;
+                    &lt;/div&gt;
+<span class="nc" id="L368">                    &quot;&quot;&quot;.formatted(escapeHtml(productEN(p.name)), escapeHtml(craftEN(p.craft)), p.price, p.stock));</span>
+<span class="nc" id="L369">        }</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">        if (!any) sb.append(&quot;&lt;div class='muted'&gt;No products yet.&lt;/div&gt;&quot;);</span>
+<span class="nc" id="L371">        sb.append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="nc" id="L372">        return sb.toString() + footer();</span>
+    }
+
+    private String doRateArtisan(String idParam, String starsParam, Session s) {
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (s.user == null) return loginPage(&quot;Log in with a customer account to rate artisans.&quot;, s);</span>
+        int aid;
+        int stars;
+        try {
+<span class="nc" id="L380">            aid = Integer.parseInt(idParam);</span>
+<span class="nc" id="L381">            stars = Integer.parseInt(starsParam);</span>
+<span class="nc" id="L382">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L383">            return notFound(s);</span>
+<span class="nc" id="L384">        }</span>
+<span class="nc" id="L385">        Outcome o = artisanService.rateArtisan(aid, stars);</span>
+<span class="nc" id="L386">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L387">        sb.append(header(&quot;Artisan profile&quot;, &quot;&quot;, s));</span>
+<span class="nc" id="L388">        sb.append(note(t(o.message()), o.ok()));</span>
+<span class="nc" id="L389">        sb.append(&quot;&lt;div class='row'&gt;&lt;a class='btn' href='/artisan?id=&quot;).append(aid).append(&quot;'&gt;Back to profile&lt;/a&gt;&quot;)</span>
+<span class="nc" id="L390">                .append(&quot;&lt;a class='btn' href='/products'&gt;Products&lt;/a&gt;&lt;/div&gt;&quot;);</span>
+<span class="nc" id="L391">        return sb.toString() + footer();</span>
+    }
+
+    /* register / login / logout */
+
+    private String registerPage(String enMessage, Session s) {
+<span class="nc bnc" id="L397" title="All 4 branches missed.">        if (s.user != null || s.artisan != null) return signedInPage(s);</span>
+<span class="nc" id="L398">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L399">        sb.append(header(&quot;Register&quot;, &quot;/register&quot;, s));</span>
+<span class="nc bnc" id="L400" title="All 4 branches missed.">        if (enMessage != null &amp;&amp; !enMessage.isBlank())</span>
+<span class="nc" id="L401">            sb.append(note(enMessage, enMessage.startsWith(&quot;Welcome&quot;)));</span>
+<span class="nc" id="L402">        StringBuilder craftOpts = new StringBuilder();</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        for (String c : CRAFTS)</span>
+<span class="nc" id="L404">            craftOpts.append(&quot;&lt;option value='&quot;).append(c).append(&quot;'&gt;&quot;).append(c).append(&quot;&lt;/option&gt;&quot;);</span>
+<span class="nc" id="L405">        sb.append(&quot;&quot;&quot;</span>
+                &lt;div class='card'&gt;
+                &lt;h3 style='margin:0 0 12px;font-size:1.05rem'&gt;Customer account&lt;/h3&gt;
+                &lt;form method='post' action='/register' class='row'&gt;
+                &lt;input type='hidden' name='role' value='customer'&gt;
+                &lt;div&gt;&lt;label&gt;Full name&lt;/label&gt;&lt;input name='name' required&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Phone (07XXXXXXXXX)&lt;/label&gt;&lt;input name='phone' required&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Email&lt;/label&gt;&lt;input name='email' type='email' required&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Password (8+, letters and numbers)&lt;/label&gt;&lt;input name='password' type='password' required&gt;&lt;/div&gt;
+                &lt;button&gt;Create account&lt;/button&gt;
+                &lt;/form&gt;&lt;/div&gt;
+                &lt;div class='card'&gt;
+                &lt;h3 style='margin:0 0 12px;font-size:1.05rem'&gt;Artisan account&lt;/h3&gt;
+                &lt;form method='post' action='/register' class='row'&gt;
+                &lt;input type='hidden' name='role' value='artisan'&gt;
+                &lt;div&gt;&lt;label&gt;Name&lt;/label&gt;&lt;input name='name' required&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Phone&lt;/label&gt;&lt;input name='phone' required&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Email&lt;/label&gt;&lt;input name='email' type='email' required&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Password (8+, letters and numbers)&lt;/label&gt;&lt;input name='password' type='password' required&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Craft&lt;/label&gt;&lt;select name='craft'&gt;%s&lt;/select&gt;&lt;/div&gt;
+                &lt;button&gt;Create artisan account&lt;/button&gt;
+                &lt;/form&gt;&lt;/div&gt;
+<span class="nc" id="L427">                &quot;&quot;&quot;.formatted(craftOpts));</span>
+<span class="nc" id="L428">        return sb.toString() + footer();</span>
+    }
+
+    private String doRegister(LinkedHashMap&lt;String, String&gt; params, Session s) {
+<span class="fc" id="L432">        String role = params.getOrDefault(&quot;role&quot;, &quot;customer&quot;);</span>
+<span class="pc bpc" id="L433" title="2 of 4 branches missed.">        if (!role.equals(&quot;customer&quot;) &amp;&amp; !role.equals(&quot;artisan&quot;))</span>
+<span class="nc" id="L434">            return registerPage(&quot;Choose a valid account type.&quot;, s);</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">        Outcome o = role.equals(&quot;artisan&quot;)</span>
+<span class="fc" id="L436">                ? artisanService.register(params.get(&quot;name&quot;), params.get(&quot;phone&quot;), craftValue(params.get(&quot;craft&quot;)),</span>
+<span class="fc" id="L437">                        params.get(&quot;email&quot;), params.get(&quot;password&quot;))</span>
+<span class="pc" id="L438">                : customerService.register(params.get(&quot;name&quot;), params.get(&quot;phone&quot;), params.get(&quot;email&quot;), params.get(&quot;password&quot;));</span>
+<span class="pc bpc" id="L439" title="2 of 4 branches missed.">        if (o.ok() &amp;&amp; role.equals(&quot;customer&quot;)) {</span>
+<span class="nc" id="L440">            s.artisan = null;</span>
+<span class="nc" id="L441">            s.user = repo.customer((int) o.value());</span>
+<span class="nc" id="L442">            return header(&quot;Register&quot;, &quot;/register&quot;, s) + note(t(o.message()), true)</span>
+                    + &quot;&lt;div class='row'&gt;&lt;a class='btn' href='/products'&gt;Start shopping&lt;/a&gt;&quot;
+<span class="nc" id="L444">                    + &quot;&lt;a class='btn' href='/cart'&gt;Cart&lt;/a&gt;&lt;/div&gt;&quot; + footer();</span>
+        }
+<span class="pc bpc" id="L446" title="1 of 2 branches missed.">        if (o.ok()) {</span>
+<span class="fc" id="L447">            s.user = null;</span>
+<span class="fc" id="L448">            s.artisan = repo.artisan((int) o.value());</span>
+<span class="fc" id="L449">            return header(&quot;Register&quot;, &quot;/register&quot;, s) + note(o.message(), true)</span>
+                    + &quot;&lt;div class='row'&gt;&lt;a class='btn' href='/artisan/dashboard'&gt;Manage products&lt;/a&gt;&quot;
+<span class="fc" id="L451">                    + &quot;&lt;a class='btn' href='/products'&gt;View storefront&lt;/a&gt;&lt;/div&gt;&quot; + footer();</span>
+        }
+<span class="nc" id="L453">        return registerPage(t(o.message()), s);</span>
+    }
+
+    private String loginPage(String enMessage, Session s) {
+<span class="nc bnc" id="L457" title="All 4 branches missed.">        if (s.user != null || s.artisan != null) return signedInPage(s);</span>
+<span class="nc" id="L458">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L459">        sb.append(header(&quot;Login&quot;, &quot;/login&quot;, s));</span>
+<span class="nc bnc" id="L460" title="All 4 branches missed.">        if (enMessage != null &amp;&amp; !enMessage.isBlank()) sb.append(note(enMessage, false));</span>
+<span class="nc" id="L461">        sb.append(&quot;&quot;&quot;</span>
+                &lt;div class='card' style='max-width:420px;margin:0 auto'&gt;
+                &lt;form method='post' action='/login'&gt;
+                &lt;label&gt;Email&lt;/label&gt;&lt;input name='email' type='email' required style='width:100%%;margin-bottom:10px'&gt;
+                &lt;label&gt;Password&lt;/label&gt;&lt;input name='password' type='password' required style='width:100%%;margin-bottom:14px'&gt;
+                &lt;label&gt;Account type&lt;/label&gt;&lt;select name='role' style='width:100%%;margin-bottom:14px'&gt;
+                &lt;option value='customer'&gt;Customer&lt;/option&gt;&lt;option value='artisan'&gt;Artisan&lt;/option&gt;&lt;/select&gt;
+                &lt;button style='width:100%%'&gt;Login&lt;/button&gt;
+                &lt;/form&gt;
+                &lt;p style='margin-top:12px;font-size:.9rem;color:#8a7a63'&gt;No account? &lt;a href='/register'&gt;Register&lt;/a&gt;&lt;/p&gt;
+                &lt;/div&gt;
+                &quot;&quot;&quot;);
+<span class="nc" id="L473">        return sb.toString() + footer();</span>
+    }
+
+    private String signedInPage(Session s) {
+<span class="nc bnc" id="L477" title="All 2 branches missed.">        String destination = s.artisan == null ? &quot;/products&quot; : &quot;/artisan/dashboard&quot;;</span>
+<span class="nc bnc" id="L478" title="All 2 branches missed.">        String label = s.artisan == null ? &quot;Continue shopping&quot; : &quot;Open artisan dashboard&quot;;</span>
+<span class="nc" id="L479">        return header(&quot;Account&quot;, &quot;&quot;, s) + note(&quot;You are already signed in.&quot;, true)</span>
+<span class="nc" id="L480">                + &quot;&lt;a class='btn' href='&quot; + destination + &quot;'&gt;&quot; + label + &quot;&lt;/a&gt;&quot; + footer();</span>
+    }
+
+    private String doLogin(LinkedHashMap&lt;String, String&gt; params, Session s) {
+<span class="fc" id="L484">        String role = params.getOrDefault(&quot;role&quot;, &quot;customer&quot;);</span>
+<span class="pc bpc" id="L485" title="3 of 4 branches missed.">        if (!role.equals(&quot;customer&quot;) &amp;&amp; !role.equals(&quot;artisan&quot;))</span>
+<span class="nc" id="L486">            return loginPage(&quot;Choose a valid account type.&quot;, s);</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (&quot;artisan&quot;.equals(params.get(&quot;role&quot;))) {</span>
+<span class="nc" id="L488">            Outcome artisanLogin = artisanService.login(params.get(&quot;email&quot;), params.get(&quot;password&quot;));</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">            if (artisanLogin.ok()) {</span>
+<span class="nc" id="L490">                s.user = null;</span>
+<span class="nc" id="L491">                s.artisan = repo.artisan((int) artisanLogin.value());</span>
+<span class="nc" id="L492">                return header(&quot;Login&quot;, &quot;/login&quot;, s) + note(artisanLogin.message(), true)</span>
+<span class="nc" id="L493">                        + &quot;&lt;div class='row'&gt;&lt;a class='btn' href='/artisan/dashboard'&gt;Manage products&lt;/a&gt;&lt;/div&gt;&quot; + footer();</span>
+            }
+<span class="nc" id="L495">            return loginPage(artisanLogin.message(), s);</span>
+        }
+<span class="fc" id="L497">        Outcome o = customerService.login(params.get(&quot;email&quot;), params.get(&quot;password&quot;));</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">        if (o.ok()) {</span>
+<span class="fc" id="L499">            s.artisan = null;</span>
+<span class="fc" id="L500">            s.user = repo.customer((int) o.value());</span>
+<span class="fc" id="L501">            return header(&quot;Login&quot;, &quot;/login&quot;, s) + note(t(o.message()), true)</span>
+                    + &quot;&lt;div class='row'&gt;&lt;a class='btn' href='/products'&gt;Products&lt;/a&gt;&quot;
+<span class="fc" id="L503">                    + &quot;&lt;a class='btn' href='/cart'&gt;Cart&lt;/a&gt;&lt;/div&gt;&quot; + footer();</span>
+        }
+<span class="nc" id="L505">        return loginPage(t(o.message()), s);</span>
+    }
+
+    private String artisanDashboard(Session s) {
+<span class="nc bnc" id="L509" title="All 2 branches missed.">        if (s.artisan == null) return loginPage(&quot;Log in with an artisan account to manage your products.&quot;, s);</span>
+<span class="nc" id="L510">        StringBuilder sb = new StringBuilder(header(&quot;Artisan dashboard&quot;, &quot;/artisan/dashboard&quot;, s));</span>
+<span class="nc" id="L511">        sb.append(&quot;&lt;p class='sub'&gt;Manage your &quot;).append(escapeHtml(craftEN(s.artisan.craft)))</span>
+<span class="nc" id="L512">                .append(&quot; products and stock.&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L513">        sb.append(&quot;&quot;&quot;</span>
+                &lt;div class='card'&gt;&lt;h3&gt;Add a product&lt;/h3&gt;
+                &lt;form method='post' action='/artisan/dashboard' class='row'&gt;
+                &lt;input type='hidden' name='action' value='add'&gt;
+                &lt;div&gt;&lt;label&gt;Product name&lt;/label&gt;&lt;input name='name' required&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Price (JOD)&lt;/label&gt;&lt;input name='price' type='number' min='0.01' max='1000' step='0.01' required&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Initial stock&lt;/label&gt;&lt;input name='stock' type='number' min='0' max='500' required&gt;&lt;/div&gt;
+                &lt;button&gt;Add product&lt;/button&gt;&lt;/form&gt;&lt;/div&gt;
+                &quot;&quot;&quot;);
+<span class="nc" id="L522">        sb.append(&quot;&lt;div class='grid'&gt;&quot;);</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">        for (Product p : productService.search(s.artisan.craft, null)) {</span>
+<span class="nc bnc" id="L524" title="All 2 branches missed.">            if (p.artisanId != s.artisan.id) continue;</span>
+<span class="nc" id="L525">            sb.append(&quot;&quot;&quot;</span>
+                    &lt;div class='card product'&gt;&lt;h3&gt;%s&lt;/h3&gt;&lt;span class='price'&gt;%.2f JOD&lt;/span&gt;
+                    &lt;span class='stock'&gt;%d in stock&lt;/span&gt;
+                    &lt;form method='post' action='/artisan/dashboard' class='row'&gt;
+                    &lt;input type='hidden' name='action' value='restock'&gt;
+                    &lt;input type='hidden' name='productId' value='%d'&gt;
+                    &lt;div&gt;&lt;label&gt;Restock quantity&lt;/label&gt;&lt;input name='qty' type='number' min='1' max='500' required&gt;&lt;/div&gt;
+                    &lt;button&gt;Restock&lt;/button&gt;&lt;/form&gt;&lt;/div&gt;
+<span class="nc" id="L533">                    &quot;&quot;&quot;.formatted(escapeHtml(productEN(p.name)), p.price, p.stock, p.id));</span>
+<span class="nc" id="L534">        }</span>
+<span class="nc" id="L535">        sb.append(&quot;&lt;/div&gt;&quot;);</span>
+<span class="nc" id="L536">        return sb.toString() + footer();</span>
+    }
+
+    private String artisanDashboardSubmit(LinkedHashMap&lt;String, String&gt; params, Session s) {
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">        if (s.artisan == null) return loginPage(&quot;Log in with an artisan account to manage your products.&quot;, s);</span>
+        Outcome result;
+<span class="fc bfc" id="L542" title="All 2 branches covered.">        if (&quot;add&quot;.equals(params.get(&quot;action&quot;))) {</span>
+            try {
+<span class="fc" id="L544">                result = productService.add(s.artisan.id, params.get(&quot;name&quot;), s.artisan.craft,</span>
+<span class="fc" id="L545">                        Double.parseDouble(params.get(&quot;price&quot;)), Integer.parseInt(params.get(&quot;stock&quot;)));</span>
+<span class="nc" id="L546">            } catch (NumberFormatException e) {</span>
+<span class="nc" id="L547">                return artisanDashboardMessage(&quot;Enter a valid product price and stock quantity.&quot;, false, s);</span>
+<span class="fc" id="L548">            }</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">        } else if (&quot;restock&quot;.equals(params.get(&quot;action&quot;))) {</span>
+            try {
+<span class="fc" id="L551">                int productId = Integer.parseInt(params.get(&quot;productId&quot;));</span>
+<span class="fc" id="L552">                Product product = repo.product(productId);</span>
+<span class="pc bpc" id="L553" title="2 of 4 branches missed.">                if (product == null || product.artisanId != s.artisan.id)</span>
+<span class="fc" id="L554">                    return artisanDashboardMessage(&quot;Product not found in your account.&quot;, false, s);</span>
+<span class="nc" id="L555">                result = productService.restock(productId, Integer.parseInt(params.get(&quot;qty&quot;)));</span>
+<span class="nc" id="L556">            } catch (NumberFormatException e) {</span>
+<span class="nc" id="L557">                return artisanDashboardMessage(&quot;Enter a valid restock quantity.&quot;, false, s);</span>
+<span class="nc" id="L558">            }</span>
+        } else {
+<span class="nc" id="L560">            return artisanDashboardMessage(&quot;Choose a valid product action.&quot;, false, s);</span>
+        }
+<span class="fc" id="L562">        return artisanDashboardMessage(result.message(), result.ok(), s);</span>
+    }
+
+    private String artisanDashboardMessage(String message, boolean ok, Session s) {
+<span class="fc" id="L566">        return header(&quot;Artisan dashboard&quot;, &quot;/artisan/dashboard&quot;, s) + note(t(message), ok)</span>
+<span class="fc" id="L567">                + &quot;&lt;a class='btn' href='/artisan/dashboard'&gt;Back to dashboard&lt;/a&gt;&quot; + footer();</span>
+    }
+
+    /* cart + checkout */
+
+    private String cartServiceSubmit(LinkedHashMap&lt;String, String&gt; params, Session s) {
+<span class="fc" id="L573">        int productId = Integer.parseInt(params.get(&quot;productId&quot;));</span>
+<span class="pc bpc" id="L574" title="1 of 4 branches missed.">        Outcome o = switch (params.getOrDefault(&quot;action&quot;, &quot;add&quot;)) {</span>
+<span class="fc" id="L575">            case &quot;add&quot; -&gt; cartService.addItem(s.cart, productId, Integer.parseInt(params.get(&quot;qty&quot;)));</span>
+<span class="fc" id="L576">            case &quot;update&quot; -&gt; cartService.changeQty(s.cart, productId, Integer.parseInt(params.get(&quot;qty&quot;)));</span>
+<span class="fc" id="L577">            case &quot;remove&quot; -&gt; cartService.removeItem(s.cart, productId);</span>
+<span class="pc" id="L578">            default -&gt; Outcome.fail(&quot;Choose a valid cart action.&quot;);</span>
+        };
+<span class="fc" id="L580">        return cartPage(o.message(), s);</span>
+    }
+
+    private String cartPage(String rawMessage, Session s) {
+<span class="fc" id="L584">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L585">        sb.append(header(&quot;Cart&quot;, &quot;/cart&quot;, s));</span>
+<span class="fc" id="L586">        sb.append(&quot;&lt;p class='sub'&gt;Review your items before checkout&lt;/p&gt;&quot;);</span>
+<span class="pc bpc" id="L587" title="1 of 4 branches missed.">        if (rawMessage != null &amp;&amp; !rawMessage.isBlank())</span>
+<span class="fc" id="L588">            sb.append(note(t(rawMessage), rawMessage.startsWith(&quot;Added &quot;)));</span>
+<span class="fc" id="L589">        var items = s.cart.all();</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">        if (items.isEmpty()) {</span>
+<span class="fc" id="L591">            sb.append(&quot;&lt;div class='card center'&gt;Your cart is empty — &lt;a href='/products'&gt;browse products&lt;/a&gt;.&lt;/div&gt;&quot;);</span>
+        } else {
+<span class="fc" id="L593">            sb.append(&quot;&quot;&quot;</span>
+                    &lt;div class='card table-wrap'&gt;&lt;table&gt;
+                    &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Product&lt;/th&gt;&lt;th&gt;Qty&lt;/th&gt;&lt;th&gt;Unit price&lt;/th&gt;&lt;th&gt;Total&lt;/th&gt;&lt;th&gt;Actions&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;
+                    &quot;&quot;&quot;);
+<span class="fc bfc" id="L597" title="All 2 branches covered.">            for (var e : items.entrySet()) {</span>
+<span class="fc" id="L598">                Product p = repo.product(e.getKey());</span>
+<span class="fc" id="L599">                sb.append(&quot;&quot;&quot;</span>
+                        &lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%d&lt;/td&gt;&lt;td&gt;%.2f JOD&lt;/td&gt;&lt;td&gt;%.2f JOD&lt;/td&gt;&lt;td&gt;
+                        &lt;form method='post' action='/cart' class='row'&gt;
+                        &lt;input type='hidden' name='productId' value='%d'&gt;
+                        &lt;input type='hidden' name='action' value='update'&gt;
+                        &lt;input type='number' name='qty' value='%d' min='1' max='5' aria-label='Quantity'&gt;
+                        &lt;button&gt;Update&lt;/button&gt;&lt;/form&gt;
+                        &lt;form method='post' action='/cart'&gt;
+                        &lt;input type='hidden' name='productId' value='%d'&gt;
+                        &lt;input type='hidden' name='action' value='remove'&gt;
+                        &lt;button&gt;Remove&lt;/button&gt;&lt;/form&gt;&lt;/td&gt;&lt;/tr&gt;
+<span class="fc" id="L610">                        &quot;&quot;&quot;.formatted(escapeHtml(productEN(p.name)), e.getValue(), p.price,</span>
+<span class="fc" id="L611">                        p.price * e.getValue(), p.id, e.getValue(), p.id));</span>
+<span class="fc" id="L612">            }</span>
+<span class="fc" id="L613">            sb.append(&quot;&lt;/tbody&gt;&lt;tfoot&gt;&lt;tr class='total'&gt;&lt;td colspan='3'&gt;Cart total&lt;/td&gt;&lt;td&gt;%.2f JOD&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/tfoot&gt;&lt;/table&gt;&lt;/div&gt;&quot;</span>
+<span class="fc" id="L614">                    .formatted(cartService.total(s.cart)));</span>
+        }
+<span class="fc" id="L616">        sb.append(&quot;&lt;div class='row' style='margin-top:14px'&gt;&quot;);</span>
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">        if (s.user != null) sb.append(&quot;&lt;a class='btn' href='/order'&gt;Checkout&lt;/a&gt;&quot;);</span>
+<span class="nc" id="L618">        else sb.append(&quot;&lt;a class='btn' href='/login'&gt;Login to checkout&lt;/a&gt;&quot;);</span>
+<span class="fc" id="L619">        sb.append(&quot;&lt;a class='btn' href='/products'&gt;Continue shopping&lt;/a&gt;&lt;/div&gt;&quot;);</span>
+<span class="fc" id="L620">        return sb.toString() + footer();</span>
+    }
+
+    private String doOrder(LinkedHashMap&lt;String, String&gt; params, Session s) {
+<span class="pc bpc" id="L624" title="1 of 2 branches missed.">        if (s.user == null) return checkoutPage(&quot;Please log in before checking out.&quot;, s);</span>
+<span class="fc" id="L625">        double km = Double.parseDouble(params.getOrDefault(&quot;km&quot;, &quot;7&quot;));</span>
+<span class="fc" id="L626">        Outcome o = orderService.place(s.user, s.cart, km, params.get(&quot;payment&quot;),</span>
+<span class="fc" id="L627">                promoValue(params.getOrDefault(&quot;promo&quot;, &quot;&quot;)), params.get(&quot;card&quot;), LocalDateTime.now());</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">        if (o.ok()) {</span>
+<span class="fc" id="L629">            s.cart.clear();</span>
+<span class="fc" id="L630">            return checkoutPage(t(o.message()) + &quot; Estimated arrival: &quot; + eta.estimate(km, 0) + &quot; minutes.&quot;, s);</span>
+        }
+<span class="fc" id="L632">        return checkoutPage(t(o.message()), s);</span>
+    }
+
+    private String checkoutPage(String message, Session s) {
+<span class="fc" id="L636">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L637">        sb.append(header(&quot;Checkout&quot;, &quot;/order&quot;, s));</span>
+<span class="fc" id="L638">        sb.append(&quot;&lt;p class='sub'&gt;Confirm delivery details and payment&lt;/p&gt;&quot;);</span>
+<span class="pc bpc" id="L639" title="2 of 4 branches missed.">        if (message != null &amp;&amp; !message.isBlank())</span>
+<span class="fc" id="L640">            sb.append(note(message, message.startsWith(&quot;Order #&quot;)));</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">        if (s.user == null) {</span>
+<span class="nc" id="L642">            sb.append(&quot;&lt;div class='card center'&gt;&lt;a href='/login'&gt;Login&lt;/a&gt; or &lt;a href='/register'&gt;register&lt;/a&gt; to place orders.&lt;/div&gt;&quot;);</span>
+<span class="nc" id="L643">            return sb.toString() + footer();</span>
+        }
+<span class="fc" id="L645">        var items = s.cart.all();</span>
+<span class="fc" id="L646">        sb.append(&quot;&lt;div class='card table-wrap'&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Item&lt;/th&gt;&lt;th&gt;Qty&lt;/th&gt;&lt;th&gt;Line total&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&quot;);</span>
+<span class="fc bfc" id="L647" title="All 2 branches covered.">        if (items.isEmpty()) sb.append(&quot;&lt;tr&gt;&lt;td colspan='3' class='center'&gt;Cart is empty&lt;/td&gt;&lt;/tr&gt;&quot;);</span>
+<span class="fc bfc" id="L648" title="All 2 branches covered.">        for (var e : items.entrySet()) {</span>
+<span class="fc" id="L649">            Product p = repo.product(e.getKey());</span>
+<span class="fc" id="L650">            sb.append(&quot;&lt;tr&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%d&lt;/td&gt;&lt;td&gt;%.2f JOD&lt;/td&gt;&lt;/tr&gt;&quot;</span>
+<span class="fc" id="L651">                    .formatted(escapeHtml(productEN(p.name)), e.getValue(), p.price * e.getValue()));</span>
+<span class="fc" id="L652">        }</span>
+<span class="fc" id="L653">        sb.append(&quot;&lt;tr class='total'&gt;&lt;td colspan='2'&gt;Cart total&lt;/td&gt;&lt;td&gt;%.2f JOD&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/div&gt;&quot;</span>
+<span class="fc" id="L654">                .formatted(cartService.total(s.cart)));</span>
+<span class="fc" id="L655">        sb.append(&quot;&quot;&quot;</span>
+                &lt;div class='card'&gt;&lt;form method='post' action='/order' class='row'&gt;
+                &lt;div&gt;&lt;label&gt;Distance (km)&lt;/label&gt;&lt;input name='km' value='7' size='5'&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Payment&lt;/label&gt;&lt;select name='payment'&gt;
+                &lt;option value='CASH'&gt;Cash on delivery&lt;/option&gt;
+                &lt;option value='CARD'&gt;Bank card&lt;/option&gt;
+                &lt;option value='WALLET'&gt;Wallet&lt;/option&gt;&lt;/select&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Promo code&lt;/label&gt;&lt;input name='promo' placeholder='HIRFA10 / STUDENTS5'&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;Card number (card only)&lt;/label&gt;&lt;input name='card' size='18'&gt;&lt;/div&gt;
+                &lt;button&gt;Place the order&lt;/button&gt;
+                &lt;/form&gt;&lt;/div&gt;
+                &lt;div class='hint'&gt;Minimum order 5 JOD · Free delivery from 100 JOD · HIRFA10 = 10% from 10 JOD · STUDENTS5 = 5%&lt;/div&gt;
+                &quot;&quot;&quot;);
+<span class="fc" id="L668">        sb.append(&quot;&lt;div class='row' style='margin-top:12px'&gt;&lt;a class='btn' href='/cart'&gt;Cart&lt;/a&gt;&quot;</span>
+                + &quot;&lt;a class='btn' href='/wallet'&gt;Wallet&lt;/a&gt;&lt;/div&gt;&quot;);
+<span class="fc" id="L670">        return sb.toString() + footer();</span>
+    }
+
+    /* wallet */
+
+    private String doWallet(LinkedHashMap&lt;String, String&gt; params, Session s) {
+<span class="nc bnc" id="L676" title="All 2 branches missed.">        if (s.user == null) return walletPage(&quot;Log in to use your wallet.&quot;, s);</span>
+<span class="nc" id="L677">        Outcome o = walletService.topUp(s.user, Double.parseDouble(params.getOrDefault(&quot;amount&quot;, &quot;0&quot;)));</span>
+<span class="nc" id="L678">        return walletPage(o.message(), s);</span>
+    }
+
+    private String walletPage(String rawMessage, Session s) {
+<span class="nc" id="L682">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L683">        sb.append(header(&quot;Wallet&quot;, &quot;/wallet&quot;, s));</span>
+<span class="nc bnc" id="L684" title="All 4 branches missed.">        if (rawMessage != null &amp;&amp; !rawMessage.isBlank())</span>
+<span class="nc" id="L685">            sb.append(note(t(rawMessage), rawMessage.startsWith(&quot;Wallet topped up.&quot;)));</span>
+<span class="nc bnc" id="L686" title="All 2 branches missed.">        if (s.user == null) {</span>
+<span class="nc" id="L687">            sb.append(&quot;&lt;div class='card center'&gt;&lt;a href='/login'&gt;Login&lt;/a&gt; to use the wallet.&lt;/div&gt;&quot;);</span>
+<span class="nc" id="L688">            return sb.toString() + footer();</span>
+        }
+<span class="nc" id="L690">        sb.append(&quot;&lt;div class='card center'&gt;&lt;div class='balance'&gt;%.2f JOD&lt;/div&gt;&lt;div class='sub' style='margin:0'&gt;Current balance&lt;/div&gt;&lt;/div&gt;&quot;</span>
+<span class="nc" id="L691">                .formatted(repo.customer(s.user.id).wallet));</span>
+<span class="nc" id="L692">        sb.append(&quot;&quot;&quot;</span>
+                &lt;div class='card'&gt;&lt;form method='post' action='/wallet' class='row'&gt;
+                &lt;div&gt;&lt;label&gt;Amount (1 – 1000 JOD)&lt;/label&gt;&lt;input name='amount' size='8'&gt;&lt;/div&gt;
+                &lt;button&gt;Top up&lt;/button&gt;
+                &lt;/form&gt;&lt;/div&gt;
+                &quot;&quot;&quot;);
+<span class="nc" id="L698">        return sb.toString() + footer();</span>
+    }
+
+    /* my orders */
+
+    private String ordersPage(Session s) {
+<span class="nc" id="L704">        return ordersPage(s, null, false);</span>
+    }
+
+    private String ordersPage(Session s, String message, boolean success) {
+<span class="fc" id="L708">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L709">        sb.append(header(&quot;My orders&quot;, &quot;/orders&quot;, s));</span>
+<span class="pc bpc" id="L710" title="2 of 4 branches missed.">        if (message != null &amp;&amp; !message.isBlank()) sb.append(note(message, success));</span>
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">        if (s.user == null) {</span>
+<span class="nc" id="L712">            sb.append(&quot;&lt;div class='card center'&gt;Log in to see your orders — &lt;a href='/login'&gt;Login&lt;/a&gt;.&lt;/div&gt;&quot;);</span>
+<span class="nc" id="L713">            return sb.toString() + footer();</span>
+        }
+<span class="fc" id="L715">        List&lt;Order&gt; list = repo.ordersByCustomer(s.user.id);</span>
+<span class="pc bpc" id="L716" title="1 of 2 branches missed.">        if (list.isEmpty()) {</span>
+<span class="nc" id="L717">            sb.append(&quot;&lt;div class='card center'&gt;No orders yet — &lt;a href='/products'&gt;start shopping&lt;/a&gt;.&lt;/div&gt;&quot;);</span>
+<span class="nc" id="L718">            return sb.toString() + footer();</span>
+        }
+<span class="fc" id="L720">        sb.append(&quot;&quot;&quot;</span>
+                &lt;div class='card table-wrap'&gt;&lt;table&gt;
+                &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Order&lt;/th&gt;&lt;th&gt;Date&lt;/th&gt;&lt;th&gt;Payment&lt;/th&gt;&lt;th&gt;Status&lt;/th&gt;&lt;th&gt;Total&lt;/th&gt;&lt;th&gt;Actions&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;
+                &quot;&quot;&quot;);
+<span class="fc bfc" id="L724" title="All 2 branches covered.">        for (Order o : list) {</span>
+<span class="fc" id="L725">            sb.append(&quot;&lt;tr&gt;&lt;td&gt;#%d&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;td&gt;&lt;span class='tag'&gt;%s&lt;/span&gt;&lt;/td&gt;&lt;td&gt;%.2f JOD&lt;/td&gt;&lt;td&gt;%s&lt;/td&gt;&lt;/tr&gt;&quot;</span>
+<span class="fc" id="L726">                    .formatted(o.id, o.createdAt.toLocalDate(), o.payment, statusEN(o.status), o.total,</span>
+<span class="pc bpc" id="L727" title="1 of 2 branches missed.">                            o.status == Order.Status.NEW</span>
+                                    ? &quot;&lt;form method='post' action='/orders'&gt;&lt;input type='hidden' name='orderId' value='&quot;
+<span class="pc" id="L729">                                    + o.id + &quot;'&gt;&lt;button&gt;Cancel order&lt;/button&gt;&lt;/form&gt;&quot; : &quot;&quot;));</span>
+<span class="fc" id="L730">        }</span>
+<span class="fc" id="L731">        sb.append(&quot;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&quot;);</span>
+<span class="fc" id="L732">        return sb.toString() + footer();</span>
+    }
+
+    private String cancelOrder(LinkedHashMap&lt;String, String&gt; params, Session s) {
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">        if (s.user == null) return loginPage(&quot;Log in with a customer account to cancel an order.&quot;, s);</span>
+<span class="fc" id="L737">        int orderId = Integer.parseInt(params.get(&quot;orderId&quot;));</span>
+<span class="fc" id="L738">        Order order = repo.order(orderId);</span>
+<span class="pc bpc" id="L739" title="2 of 4 branches missed.">        if (order == null || order.customerId != s.user.id)</span>
+<span class="nc" id="L740">            return ordersPage(s, &quot;Order not found in your account.&quot;, false);</span>
+<span class="fc" id="L741">        Outcome result = orderLifecycleService.cancel(order, LocalDateTime.now());</span>
+<span class="pc bpc" id="L742" title="1 of 2 branches missed.">        if (result.ok()) {</span>
+<span class="fc bfc" id="L743" title="All 2 branches covered.">            for (OrderItem item : order.items) {</span>
+<span class="fc" id="L744">                Product product = repo.product(item.productId());</span>
+<span class="pc bpc" id="L745" title="1 of 2 branches missed.">                if (product != null) {</span>
+<span class="fc" id="L746">                    product.stock += item.qty();</span>
+<span class="fc" id="L747">                    repo.saveProduct(product);</span>
+                }
+<span class="fc" id="L749">            }</span>
+<span class="fc bfc" id="L750" title="All 2 branches covered.">            if (&quot;WALLET&quot;.equals(order.payment)) {</span>
+<span class="fc" id="L751">                Customer customer = repo.customer(s.user.id);</span>
+<span class="fc" id="L752">                customer.wallet = Math.round((customer.wallet + order.total) * 100.0) / 100.0;</span>
+<span class="fc" id="L753">                repo.saveCustomer(customer);</span>
+<span class="fc" id="L754">                s.user = customer;</span>
+            }
+<span class="fc" id="L756">            repo.updateStatus(order.id, order.status);</span>
+        }
+<span class="fc" id="L758">        return ordersPage(s, result.message(), result.ok());</span>
+    }
+
+    private String statusEN(Order.Status st) {
+<span class="pc bpc" id="L762" title="4 of 5 branches missed.">        return switch (st) {</span>
+<span class="nc" id="L763">            case NEW -&gt; &quot;New&quot;;</span>
+<span class="nc" id="L764">            case PREPARING -&gt; &quot;Preparing&quot;;</span>
+<span class="nc" id="L765">            case SHIPPING -&gt; &quot;Out for delivery&quot;;</span>
+<span class="nc" id="L766">            case DELIVERED -&gt; &quot;Delivered&quot;;</span>
+<span class="fc" id="L767">            case CANCELLED -&gt; &quot;Cancelled&quot;;</span>
+        };
+    }
+
+    /* admin reports */
+
+    private String adminPage(String idParam, String from, String to, Session s) {
+<span class="nc" id="L774">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L775">        sb.append(header(&quot;Reports&quot;, &quot;/admin&quot;, s));</span>
+<span class="nc" id="L776">        sb.append(&quot;&lt;p class='sub'&gt;Revenue and units sold per artisan within a period&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L777">        StringBuilder opts = new StringBuilder();</span>
+<span class="nc bnc" id="L778" title="All 2 branches missed.">        for (Artisan a : repo.artisans()) {</span>
+<span class="nc bnc" id="L779" title="All 8 branches missed.">            String chosen = (idParam != null &amp;&amp; (&quot;&quot; + a.id).equals(idParam)) || (idParam == null &amp;&amp; a.id == 1) ? &quot; selected&quot; : &quot;&quot;;</span>
+<span class="nc" id="L780">            opts.append(&quot;&lt;option value='&quot;).append(a.id).append(&quot;'&quot;).append(chosen).append(&quot;&gt;&quot;)</span>
+<span class="nc" id="L781">                    .append(escapeHtml(nameEN(a.name))).append(&quot;&lt;/option&gt;&quot;);</span>
+<span class="nc" id="L782">        }</span>
+<span class="nc" id="L783">        sb.append(&quot;&quot;&quot;</span>
+                &lt;div class='card'&gt;&lt;form method='get' action='/admin' class='row'&gt;
+                &lt;div&gt;&lt;label&gt;Artisan&lt;/label&gt;&lt;select name='id'&gt;%s&lt;/select&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;From&lt;/label&gt;&lt;input name='from' type='date' value='%s'&gt;&lt;/div&gt;
+                &lt;div&gt;&lt;label&gt;To&lt;/label&gt;&lt;input name='to' type='date' value='%s'&gt;&lt;/div&gt;
+                &lt;button&gt;Run report&lt;/button&gt;
+                &lt;/form&gt;&lt;/div&gt;
+<span class="nc" id="L790">                &quot;&quot;&quot;.formatted(opts,</span>
+<span class="nc bnc" id="L791" title="All 2 branches missed.">                escapeHtml(String.valueOf(from == null ? LocalDateTime.now().toLocalDate() : from)),</span>
+<span class="nc bnc" id="L792" title="All 2 branches missed.">                escapeHtml(String.valueOf(to == null ? LocalDateTime.now().toLocalDate() : to))));</span>
+<span class="nc bnc" id="L793" title="All 6 branches missed.">        if (idParam != null &amp;&amp; from != null &amp;&amp; to != null) {</span>
+<span class="nc" id="L794">            int aid = Integer.parseInt(idParam);</span>
+<span class="nc" id="L795">            Artisan a = repo.artisan(aid);</span>
+<span class="nc bnc" id="L796" title="All 2 branches missed.">            if (a != null) {</span>
+<span class="nc" id="L797">                ReportService.ArtisanReport r = reportService.artisanReport(aid,</span>
+<span class="nc" id="L798">                        LocalDateTime.parse(from + &quot;T00:00:00&quot;), LocalDateTime.parse(to + &quot;T23:59:59&quot;));</span>
+<span class="nc" id="L799">                sb.append(&quot;&quot;&quot;</span>
+                        &lt;div class='card'&gt;&lt;h3 style='margin:0 0 8px'&gt;%s &lt;span class='tag'&gt;%s&lt;/span&gt;&lt;/h3&gt;
+                        &lt;p style='margin:0'&gt;&lt;b&gt;%s&lt;/b&gt;&lt;/p&gt;&lt;/div&gt;
+<span class="nc" id="L802">                        &quot;&quot;&quot;.formatted(escapeHtml(nameEN(a.name)), escapeHtml(craftEN(a.craft)),</span>
+<span class="nc" id="L803">                        escapeHtml(t(r.message()))));</span>
+<span class="nc" id="L804">            } else {</span>
+<span class="nc" id="L805">                sb.append(note(&quot;Artisan not found.&quot;, false));</span>
+            }
+        }
+<span class="nc" id="L808">        return sb.toString() + footer();</span>
+    }
+
+    private String notFound(Session s) {
+<span class="nc" id="L812">        return header(&quot;Page not found&quot;, &quot;&quot;, s)</span>
+                + &quot;&lt;div class='card center'&gt;The page does not exist — &lt;a href='/products'&gt;back to products&lt;/a&gt;.&lt;/div&gt;&quot;
+<span class="nc" id="L814">                + footer();</span>
+    }
+
+    private LinkedHashMap&lt;String, String&gt; parse(String body) {
+<span class="fc" id="L818">        LinkedHashMap&lt;String, String&gt; map = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L819" title="All 2 branches covered.">        for (String pair : body.split(&quot;&amp;&quot;)) {</span>
+<span class="fc" id="L820">            int eq = pair.indexOf('=');</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">            if (eq &gt; 0) map.put(urlDecode(pair.substring(0, eq)), urlDecode(pair.substring(eq + 1)));</span>
+        }
+<span class="fc" id="L823">        return map;</span>
+    }
+
+    private String urlDecode(String s) {
+<span class="fc" id="L827">        return java.net.URLDecoder.decode(s, StandardCharsets.UTF_8);</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L831" title="All 2 branches missed.">        Repo repo = new Repo(args.length &gt; 0 ? args[0] : &quot;handmade.db&quot;);</span>
+<span class="nc" id="L832">        repo.seed();</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">        new WebServer(repo).start(args.length &gt; 1 ? Integer.parseInt(args[1]) : 8080);</span>
+<span class="nc" id="L834">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

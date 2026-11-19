@@ -1,11 +1,12 @@
-Feature: تسجيل عميل جديد
+Feature: Customer registration
 
-Scenario: عميل جديد يسجّل ببيانات صحيحة
-Given المستخدم أدخل الاسم "نور العايدة" والهاتف "0771112223" والبريد "nour@gmail.com" وكلمة المرور "Nour@2024"
-When طلب إنشاء الحساب
-Then يُنشئ النظام حساباً جديداً ويظهر "مرحباً نور العايدة، تم إنشاء حسابك بنجاح"
+Scenario: Register with valid details
+  Given a visitor enters "Nour Ayada", "0771112223", "nour@example.com", and "NourPass2026"
+  When the customer registration form is submitted
+  Then a customer account is created
+  And the new customer is signed in
 
-Scenario: عميل يحاول التسجيل ببريد مسجل مسبقاً
-Given البريد "amal@gmail.com" مسجل مسبقاً على المنصة
-When طلب التسجيل بنفس البريد
-Then يرفض النظام الطلب ويظهر "البريد الإلكتروني مسجل مسبقاً"
+Scenario: Reject an email address already in use
+  Given an account already uses "amal@example.com"
+  When a visitor registers with the same email address
+  Then registration is rejected with a duplicate-email message

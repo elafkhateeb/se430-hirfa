@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hirfa Requirements and Test Design — SE430</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#26332d;background:#f3f5f2}
+*{box-sizing:border-box}
+body{margin:0;line-height:1.55}
+header{background:#173f35;color:#fff;padding:22px max(calc((100vw - 1060px)/2),24px)}
+header h1{margin:0;font-size:1.7rem}
+header p{margin:5px 0 0;color:#d9e8dc}
+nav{background:#fff;border-bottom:1px solid #dbe3dc;padding:10px max(calc((100vw - 1060px)/2),24px);display:flex;gap:18px;flex-wrap:wrap}
+a{color:#17634c}
+main{max-width:1060px;margin:26px auto;padding:0 24px 48px}
+section{background:#fff;border:1px solid #dbe3dc;border-radius:12px;padding:22px;margin:18px 0;break-inside:avoid}
+h2{color:#173f35;margin-top:0}
+h3{margin:14px 0 7px;color:#2e5144}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.summary div{background:#f2f7f3;border-radius:8px;padding:12px}
+.summary b{display:block;color:#173f35}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th,td{text-align:left;vertical-align:top;padding:9px;border:1px solid #dbe3dc}
+th{background:#edf3ee}
+pre{white-space:pre-wrap;background:#f5f7f5;border-left:3px solid #4b8c70;padding:14px;overflow-wrap:anywhere}
+code{font-family:Consolas,monospace}
+.muted{color:#607167}
+.feature{margin-top:24px;padding-top:10px;border-top:1px solid #dbe3dc}
+footer{text-align:center;color:#607167;padding:25px}
+@media print{body{background:#fff}nav{display:none}main{max-width:none;padding:0 12px}section{box-shadow:none;page-break-inside:avoid}a{color:inherit;text-decoration:none}}
+</style>
+</head>
+<body>
+<header><h1>Hirfa — Requirements and Test Design</h1>
+<p>SE430 Software Testing Project · Fall 2026</p></header>
+<nav aria-label="Requirements navigation"><a href="#r01">R01</a> <span aria-hidden="true">|</span> <a href="#r02">R02</a> <span aria-hidden="true">|</span> <a href="#r03">R03</a> <span aria-hidden="true">|</span> <a href="#r04">R04</a> <span aria-hidden="true">|</span> <a href="#r05">R05</a> <span aria-hidden="true">|</span> <a href="#r06">R06</a> <span aria-hidden="true">|</span> <a href="#r07">R07</a> <span aria-hidden="true">|</span> <a href="#r08">R08</a> <span aria-hidden="true">|</span> <a href="#r09">R09</a> <span aria-hidden="true">|</span> <a href="#r10">R10</a> <span aria-hidden="true">|</span> <a href="#r11">R11</a> <span aria-hidden="true">|</span> <a href="#r12">R12</a> <span aria-hidden="true">|</span> <a href="#r13">R13</a> <span aria-hidden="true">|</span> <a href="#r14">R14</a> <span aria-hidden="true">|</span> <a href="#r15">R15</a> <span aria-hidden="true">|</span> <a href="#r16">R16</a> <span aria-hidden="true">|</span> <a href="#r17">R17</a> <span aria-hidden="true">|</span> <a href="#r18">R18</a> <span aria-hidden="true">|</span> <a href="#r19">R19</a> <span aria-hidden="true">|</span> <a href="#r20">R20</a></nav>
+<main>
+<section id="overview">
+  <h2>Project overview</h2>
+  <p>Hirfa is a Java and SQLite handmade-goods marketplace. Customers can discover products,
+  manage a cart, place and track orders, and pay using supported methods. Artisans create
+  accounts and manage their own products and stock.</p>
+  <div class="summary">
+    <div><b>Functional requirements</b>20</div>
+    <div><b>BDD format</b>Gherkin scenarios</div>
+    <div><b>Black-box methods</b>Equivalence partitioning and boundary-value analysis</div>
+    <div><b>White-box method</b>JUnit 5 tests with JaCoCo coverage reporting</div>
+  </div>
+</section>
+<section id="team">
+  <h2>Team responsibilities</h2>
+  <table><thead><tr><th>Member</th><th>Focus areas</th></tr></thead><tbody>
+    <tr><td>Elaf Alkhatib</td><td>Artisan requirements, delivery fees, wallet and loyalty, requirements documentation</td></tr>
+    <tr><td>Dana Haddad</td><td>Persistence and models, cart, payments, order lifecycle, artisan reports</td></tr>
+    <tr><td>Raghed Ananbeh</td><td>Products, discounts, delivery estimates, service setup</td></tr>
+    <tr><td>Alaa Alomari</td><td>Customer accounts, checkout, web interface, test and coverage documentation</td></tr>
+  </tbody></table>
+</section>
+<section id="method">
+  <h2>Testing approach</h2>
+  <p>Black-box cases cover valid and invalid input partitions and relevant numeric boundaries.
+  White-box tests are organized by service in <code>test/com/hirfa/</code>; run them with the
+  bundled JUnit ConsoleLauncher. Generate a JaCoCo report using the commands in the repository
+  README. Coverage values should be taken from the report generated for the current source revision.</p>
+  <p>The report covers the model, repository, service, and web application packages.</p>
+</section>
+<section id="trace">
+  <h2>Traceability</h2>
+  <table><thead><tr><th>Requirements</th><th>Implementation</th><th>JUnit test</th></tr></thead><tbody><tr><td>R01 — Customer registration</td><td><code>CustomerService.register</code></td><td><code>CustomerServiceTest</code></td></tr><tr><td>R02 — Customer login</td><td><code>CustomerService.login</code></td><td><code>CustomerServiceTest</code></td></tr><tr><td>R03 — Artisan registration and account</td><td><code>ArtisanService.register</code></td><td><code>ArtisanServiceTest</code></td></tr><tr><td>R04 — Add a product</td><td><code>ProductService.add</code></td><td><code>ProductServiceTest</code></td></tr><tr><td>R05 — Restock a product</td><td><code>ProductService.restock</code></td><td><code>ProductServiceTest</code></td></tr><tr><td>R06 — Search the catalog</td><td><code>ProductService.search</code></td><td><code>ProductServiceTest</code></td></tr><tr><td>R07 — Add a product to the cart</td><td><code>CartService.addItem</code></td><td><code>CartServiceTest</code></td></tr><tr><td>R08 — Place an order</td><td><code>OrderService.place</code></td><td><code>OrderServiceTest</code></td></tr><tr><td>R09 — Calculate delivery fees</td><td><code>DeliveryFeeCalculator.fee</code></td><td><code>DeliveryFeeCalculatorTest</code></td></tr><tr><td>R10 — Apply a promotion</td><td><code>DiscountCalculator.apply</code></td><td><code>DiscountCalculatorTest</code></td></tr><tr><td>R11 — Process payment</td><td><code>PaymentService.pay</code></td><td><code>PaymentServiceTest</code></td></tr><tr><td>R12 — Cancel an order</td><td><code>OrderLifecycleService.cancel</code></td><td><code>OrderLifecycleServiceTest</code></td></tr><tr><td>R13 — Advance an order status</td><td><code>OrderLifecycleService.advance</code></td><td><code>OrderLifecycleServiceTest</code></td></tr><tr><td>R14 — Rate an artisan</td><td><code>ArtisanService.rateArtisan</code></td><td><code>ArtisanServiceTest</code></td></tr><tr><td>R15 — Top up a wallet</td><td><code>WalletService.topUp</code></td><td><code>WalletAndLoyaltyTest</code></td></tr><tr><td>R16 — Enforce the minimum order</td><td><code>OrderService.place</code></td><td><code>OrderServiceTest</code></td></tr><tr><td>R17 — Change a cart quantity</td><td><code>CartService.changeQty</code></td><td><code>CartServiceTest</code></td></tr><tr><td>R18 — Estimate delivery time</td><td><code>EtaCalculator.estimate</code></td><td><code>EtaCalculatorTest</code></td></tr><tr><td>R19 — Report artisan sales</td><td><code>ReportService.artisanReport</code></td><td><code>ReportServiceTest</code></td></tr><tr><td>R20 — Calculate customer loyalty tier</td><td><code>LoyaltyService.tierFor</code></td><td><code>WalletAndLoyaltyTest</code></td></tr></tbody></table>
+</section>
+
+<section id="r01">
+  <h2>R01 — Customer registration</h2>
+  <p>A customer can register with a name, Jordanian mobile number, unique email address, and strong password.</p>
+  <p class="muted"><b>Implementation:</b> <code>CustomerService.register</code> &nbsp; <b>JUnit:</b> <code>CustomerServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Customer registration
+
+Scenario: Register with valid details
+  Given a visitor enters &quot;Nour Ayada&quot;, &quot;0771112223&quot;, &quot;nour@example.com&quot;, and &quot;NourPass2026&quot;
+  When the customer registration form is submitted
+  Then a customer account is created
+  And the new customer is signed in
+
+Scenario: Reject an email address already in use
+  Given an account already uses &quot;amal@example.com&quot;
+  When a visitor registers with the same email address
+  Then registration is rejected with a duplicate-email message
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Valid partition</td><td>Name, valid Jordanian phone, unused email, strong password</td><td>Account is created</td></tr><tr><td>Duplicate email</td><td>Email already belongs to an account</td><td>Registration is rejected</td></tr><tr><td>Invalid phone</td><td>Phone number does not match the Jordanian mobile format</td><td>Registration is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r02">
+  <h2>R02 — Customer login</h2>
+  <p>A registered customer can sign in with the email address and password used at registration.</p>
+  <p class="muted"><b>Implementation:</b> <code>CustomerService.login</code> &nbsp; <b>JUnit:</b> <code>CustomerServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Customer login
+
+Scenario: Sign in with valid customer credentials
+  Given a customer account exists for &quot;amal@example.com&quot;
+  When the customer submits the correct password
+  Then the customer is signed in
+  And customer navigation is displayed
+
+Scenario: Reject an incorrect password
+  Given a customer account exists for &quot;amal@example.com&quot;
+  When the customer submits an incorrect password
+  Then sign-in is rejected
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Valid partition</td><td>Registered email and matching password</td><td>Customer is signed in</td></tr><tr><td>Invalid password</td><td>Registered email and incorrect password</td><td>Sign-in is rejected</td></tr><tr><td>Unknown account</td><td>Email address is not registered</td><td>Sign-in is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r03">
+  <h2>R03 — Artisan registration and account</h2>
+  <p>An artisan creates an account with contact details, a unique email address, a strong password, and an approved craft.</p>
+  <p class="muted"><b>Implementation:</b> <code>ArtisanService.register</code> &nbsp; <b>JUnit:</b> <code>ArtisanServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Artisan registration and account
+
+Scenario: Register a complete artisan account
+  Given an artisan enters valid contact details and selects &quot;Leather&quot;
+  When the artisan registration form is submitted
+  Then an artisan account is created
+  And the artisan is signed in to the product dashboard
+
+Scenario: Reject an unapproved craft
+  Given &quot;Printing&quot; is not an approved craft
+  When an artisan submits that craft
+  Then the account is not created
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Valid partition</td><td>Name, phone, unique email, strong password, approved craft</td><td>Artisan account is created</td></tr><tr><td>Invalid craft</td><td>Craft is not in the approved list</td><td>Registration is rejected</td></tr><tr><td>Weak password</td><td>Password is shorter than 8 characters or has no digit</td><td>Registration is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r04">
+  <h2>R04 — Add a product</h2>
+  <p>An artisan adds a named product in an approved craft with a price from 0.01 to 1000 JOD and stock from 0 to 500.</p>
+  <p class="muted"><b>Implementation:</b> <code>ProductService.add</code> &nbsp; <b>JUnit:</b> <code>ProductServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Add a handmade product
+
+Scenario: Add a valid product
+  Given an artisan enters &quot;Copper Ring&quot;, a price of 12.50 JOD, and stock of 10
+  When the artisan submits the product
+  Then the product is saved in the artisan&#x27;s craft
+  And the product appears in the storefront
+
+Scenario: Reject a product with a zero price
+  Given an artisan enters a price of 0 JOD
+  When the artisan submits the product
+  Then the product is not saved
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Lower price boundary</td><td>Price = 0.01 JOD; stock = 0</td><td>Product is accepted</td></tr><tr><td>Upper limits</td><td>Price = 1000 JOD; stock = 500</td><td>Product is accepted</td></tr><tr><td>Out of range</td><td>Price = 0 or stock = 501</td><td>Product is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r05">
+  <h2>R05 — Restock a product</h2>
+  <p>An artisan can add a positive quantity to a product&#x27;s stock without exceeding the 500-item limit.</p>
+  <p class="muted"><b>Implementation:</b> <code>ProductService.restock</code> &nbsp; <b>JUnit:</b> <code>ProductServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Restock a product
+
+Scenario: Restock an available product
+  Given an artisan owns a product with 4 items in stock
+  When the artisan adds 6 items
+  Then the stock becomes 10
+
+Scenario: Reject restocking above the stock limit
+  Given a product has 499 items in stock
+  When the artisan adds 2 items
+  Then the stock remains unchanged
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Valid partition</td><td>Stock = 10; restock by 5</td><td>Stock becomes 15</td></tr><tr><td>Zero quantity boundary</td><td>Restock by 0</td><td>Request is rejected</td></tr><tr><td>Upper stock boundary</td><td>Stock = 499; restock by 2</td><td>Request is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r06">
+  <h2>R06 — Search the catalog</h2>
+  <p>A visitor can filter products by an approved craft, a maximum price, or both.</p>
+  <p class="muted"><b>Implementation:</b> <code>ProductService.search</code> &nbsp; <b>JUnit:</b> <code>ProductServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Search the product catalog
+
+Scenario: Filter products by craft
+  Given the catalog contains products in several crafts
+  When a visitor selects &quot;Soap&quot;
+  Then only soap products are displayed
+
+Scenario: Filter products by maximum price
+  Given the catalog contains products at different prices
+  When a visitor sets the maximum price to 10 JOD
+  Then products above 10 JOD are excluded
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Craft filter</td><td>Select one approved craft</td><td>Only matching products are returned</td></tr><tr><td>Maximum price boundary</td><td>Maximum = 10 JOD</td><td>Products costing 10 JOD or less are returned</td></tr><tr><td>No matches</td><td>Select a craft and price with no matching products</td><td>An empty result is returned</td></tr></tbody></table>
+</section>
+
+<section id="r07">
+  <h2>R07 — Add a product to the cart</h2>
+  <p>A customer can add an in-stock product in a quantity from 1 to 5, subject to available stock.</p>
+  <p class="muted"><b>Implementation:</b> <code>CartService.addItem</code> &nbsp; <b>JUnit:</b> <code>CartServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Add a product to the cart
+
+Scenario: Add an in-stock item
+  Given a product has 12 items in stock
+  When a customer adds 2 items to the cart
+  Then the cart contains 2 of that product
+
+Scenario: Reject a quantity above the per-product limit
+  Given a product has 12 items in stock
+  When a customer tries to add 6 items
+  Then the cart is unchanged
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Lower quantity boundary</td><td>Add 1 item when stock is available</td><td>Item is added</td></tr><tr><td>Upper quantity boundary</td><td>Add 5 items when stock is at least 5</td><td>Item is added</td></tr><tr><td>Invalid quantity</td><td>Add 0 or 6 items</td><td>Cart is unchanged</td></tr></tbody></table>
+</section>
+
+<section id="r08">
+  <h2>R08 — Place an order</h2>
+  <p>A signed-in customer can place a non-empty order using a supported payment method and valid delivery details.</p>
+  <p class="muted"><b>Implementation:</b> <code>OrderService.place</code> &nbsp; <b>JUnit:</b> <code>OrderServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Place an order
+
+Scenario: Place an order with valid details
+  Given a signed-in customer has a valid cart and delivery distance
+  When the customer confirms the order with cash on delivery
+  Then the order is stored with its items and calculated total
+  And the purchased stock is reserved
+
+Scenario: Reject an empty cart
+  Given a signed-in customer has an empty cart
+  When the customer confirms checkout
+  Then no order is created
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Valid checkout</td><td>Signed-in customer, non-empty cart, supported payment</td><td>Order is created and stock is reserved</td></tr><tr><td>Empty cart</td><td>Signed-in customer has no cart items</td><td>Order is not created</td></tr><tr><td>Unsupported payment</td><td>Payment method is not supported</td><td>Order is not created</td></tr></tbody></table>
+</section>
+
+<section id="r09">
+  <h2>R09 — Calculate delivery fees</h2>
+  <p>Delivery fees depend on distance, with free delivery for qualifying orders and a maximum fee.</p>
+  <p class="muted"><b>Implementation:</b> <code>DeliveryFeeCalculator.fee</code> &nbsp; <b>JUnit:</b> <code>DeliveryFeeCalculatorTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Calculate delivery fees
+
+Scenario: Apply a distance-based fee
+  Given an order subtotal is below the free-delivery threshold
+  When the delivery distance is 7 kilometers
+  Then the fee for the matching distance band is charged
+
+Scenario: Waive the fee for a qualifying order
+  Given an order subtotal is at least 100 JOD
+  When delivery fees are calculated
+  Then the delivery fee is 0 JOD
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Distance band</td><td>Subtotal below 100 JOD; distance = 7 km</td><td>Fee for the 5–15 km band is charged</td></tr><tr><td>Free-delivery boundary</td><td>Subtotal = 100 JOD</td><td>Fee is 0 JOD</td></tr><tr><td>Maximum distance</td><td>Distance beyond the supported maximum</td><td>Fee is capped at 10 JOD</td></tr></tbody></table>
+</section>
+
+<section id="r10">
+  <h2>R10 — Apply a promotion</h2>
+  <p>Supported promotion codes apply their documented percentage discounts and minimum subtotal rules.</p>
+  <p class="muted"><b>Implementation:</b> <code>DiscountCalculator.apply</code> &nbsp; <b>JUnit:</b> <code>DiscountCalculatorTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Apply a promotion
+
+Scenario: Apply HIRFA10 to an eligible subtotal
+  Given the subtotal is at least 10 JOD
+  When the customer enters &quot;HIRFA10&quot;
+  Then a 10 percent discount is applied
+
+Scenario: Reject HIRFA10 below its minimum
+  Given the subtotal is below 10 JOD
+  When the customer enters &quot;HIRFA10&quot;
+  Then no discount is applied and an eligibility message is shown
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Eligible HIRFA10</td><td>Subtotal = 10 JOD; code = HIRFA10</td><td>10% discount is applied</td></tr><tr><td>Below minimum</td><td>Subtotal = 9.99 JOD; code = HIRFA10</td><td>Code is rejected</td></tr><tr><td>Unknown code</td><td>Enter an unsupported promotion code</td><td>No discount is applied</td></tr></tbody></table>
+</section>
+
+<section id="r11">
+  <h2>R11 — Process payment</h2>
+  <p>Cash, a valid 16-digit card, or a customer wallet with enough funds can pay for an order.</p>
+  <p class="muted"><b>Implementation:</b> <code>PaymentService.pay</code> &nbsp; <b>JUnit:</b> <code>PaymentServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Process payment
+
+Scenario: Pay with a valid card
+  Given a customer has a valid card number
+  When the customer submits a card payment
+  Then the payment is confirmed
+
+Scenario: Reject an invalid card number
+  Given a customer submits a card number with fewer than 16 digits
+  When the payment is processed
+  Then the payment is rejected
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Cash payment</td><td>Cash order total = 500 JOD</td><td>Payment is accepted</td></tr><tr><td>Card boundary</td><td>Card number contains exactly 16 digits</td><td>Card payment is accepted</td></tr><tr><td>Insufficient wallet</td><td>Wallet balance is less than the order total</td><td>Payment is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r12">
+  <h2>R12 — Cancel an order</h2>
+  <p>A new order can be cancelled within two hours; wallet-funded amounts are refunded.</p>
+  <p class="muted"><b>Implementation:</b> <code>OrderLifecycleService.cancel</code> &nbsp; <b>JUnit:</b> <code>OrderLifecycleServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Cancel an order
+
+Scenario: Cancel a new order within two hours
+  Given an order is new and was placed 30 minutes ago
+  When the customer cancels the order
+  Then the order is cancelled
+  And any wallet-funded amount is refunded
+
+Scenario: Reject cancellation after two hours
+  Given an order was placed more than two hours ago
+  When the customer cancels the order
+  Then the order remains unchanged
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Within cancellation window</td><td>New order age = 119 minutes</td><td>Order is cancelled</td></tr><tr><td>Cancellation boundary</td><td>New order age = 120 minutes</td><td>Order may still be cancelled</td></tr><tr><td>Outside cancellation window</td><td>New order age = 121 minutes</td><td>Cancellation is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r13">
+  <h2>R13 — Advance an order status</h2>
+  <p>Order states follow the supported lifecycle and terminal states cannot advance.</p>
+  <p class="muted"><b>Implementation:</b> <code>OrderLifecycleService.advance</code> &nbsp; <b>JUnit:</b> <code>OrderLifecycleServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Advance an order status
+
+Scenario: Advance to the next valid state
+  Given an order is in the new state
+  When the order advances
+  Then its state becomes preparing
+
+Scenario: Do not advance a terminal order
+  Given an order is delivered
+  When the order advances
+  Then its state remains delivered
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Valid transition</td><td>New order advances once</td><td>Status becomes Preparing</td></tr><tr><td>Terminal state</td><td>Delivered order advances</td><td>Status remains Delivered</td></tr><tr><td>Cancelled state</td><td>Cancelled order advances</td><td>Status remains Cancelled</td></tr></tbody></table>
+</section>
+
+<section id="r14">
+  <h2>R14 — Rate an artisan</h2>
+  <p>A customer can submit a rating from 1 to 5 stars and the artisan&#x27;s average is updated.</p>
+  <p class="muted"><b>Implementation:</b> <code>ArtisanService.rateArtisan</code> &nbsp; <b>JUnit:</b> <code>ArtisanServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Rate an artisan
+
+Scenario: Submit a valid rating
+  Given an artisan profile is available
+  When a customer submits 5 stars
+  Then the rating count and average are updated
+
+Scenario: Reject a rating outside the supported range
+  Given an artisan profile is available
+  When a customer submits 6 stars
+  Then the rating is rejected
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Lower rating boundary</td><td>Submit 1 star</td><td>Rating is recorded</td></tr><tr><td>Upper rating boundary</td><td>Submit 5 stars</td><td>Rating is recorded</td></tr><tr><td>Invalid rating</td><td>Submit 0 or 6 stars</td><td>Rating is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r15">
+  <h2>R15 — Top up a wallet</h2>
+  <p>A customer can top up a wallet by an amount from 1 to 1000 JOD.</p>
+  <p class="muted"><b>Implementation:</b> <code>WalletService.topUp</code> &nbsp; <b>JUnit:</b> <code>WalletAndLoyaltyTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Top up a wallet
+
+Scenario: Add a valid top-up
+  Given a customer wallet has a balance of 20 JOD
+  When the customer adds 25 JOD
+  Then the wallet balance becomes 45 JOD
+
+Scenario: Reject an amount above the limit
+  Given a customer requests a top-up of 1001 JOD
+  When the top-up is processed
+  Then the wallet balance is unchanged
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Lower top-up boundary</td><td>Top up by 1 JOD</td><td>Balance increases by 1 JOD</td></tr><tr><td>Upper top-up boundary</td><td>Top up by 1000 JOD</td><td>Balance increases by 1000 JOD</td></tr><tr><td>Out of range</td><td>Top up by 0 or 1001 JOD</td><td>Balance is unchanged</td></tr></tbody></table>
+</section>
+
+<section id="r16">
+  <h2>R16 — Enforce the minimum order</h2>
+  <p>An order subtotal must meet the 5 JOD minimum before fees and discounts.</p>
+  <p class="muted"><b>Implementation:</b> <code>OrderService.place</code> &nbsp; <b>JUnit:</b> <code>OrderServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Enforce the minimum order
+
+Scenario: Accept an order at the minimum
+  Given a customer cart has a subtotal of 5 JOD
+  When the customer confirms the order
+  Then checkout may continue
+
+Scenario: Reject an order below the minimum
+  Given a customer cart has a subtotal of 4.99 JOD
+  When the customer confirms the order
+  Then no order is created
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Minimum boundary</td><td>Cart subtotal = 5 JOD</td><td>Checkout is allowed</td></tr><tr><td>Below minimum</td><td>Cart subtotal = 4.99 JOD</td><td>Order is rejected</td></tr><tr><td>Empty cart</td><td>Cart has no items</td><td>Order is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r17">
+  <h2>R17 — Change a cart quantity</h2>
+  <p>A customer can change a cart quantity within the supported per-product limit and current stock.</p>
+  <p class="muted"><b>Implementation:</b> <code>CartService.changeQty</code> &nbsp; <b>JUnit:</b> <code>CartServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Change a cart quantity
+
+Scenario: Update a quantity within stock
+  Given a cart contains 1 item and 8 are in stock
+  When the customer changes the quantity to 4
+  Then the cart contains 4 items
+
+Scenario: Reject a quantity above current stock
+  Given a cart contains 1 item and 3 are in stock
+  When the customer changes the quantity to 4
+  Then the cart remains unchanged
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Valid quantity</td><td>Change quantity to 3; stock = 5</td><td>Cart quantity becomes 3</td></tr><tr><td>Per-item limit</td><td>Change quantity to 6</td><td>Change is rejected</td></tr><tr><td>Stock limit</td><td>Change quantity to 4; stock = 3</td><td>Change is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r18">
+  <h2>R18 — Estimate delivery time</h2>
+  <p>The estimated delivery time is based on a fixed preparation time, distance, and applicable long-distance or high-load additions.</p>
+  <p class="muted"><b>Implementation:</b> <code>EtaCalculator.estimate</code> &nbsp; <b>JUnit:</b> <code>EtaCalculatorTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Estimate delivery time
+
+Scenario: Estimate a standard delivery
+  Given the delivery distance is 5 kilometers and the current load is 10 orders
+  When the estimate is calculated
+  Then the estimate includes preparation and travel time
+
+Scenario: Add the high-load allowance
+  Given the delivery distance is 5 kilometers and the current load is 16 orders
+  When the estimate is calculated
+  Then the high-load allowance is included
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Standard estimate</td><td>Distance = 5 km; peak time = false</td><td>Base preparation and travel time are included</td></tr><tr><td>High-load estimate</td><td>Distance = 5 km; current load = 16</td><td>45-minute high-load allowance is added</td></tr><tr><td>Long-distance estimate</td><td>Distance = 31 km</td><td>60-minute long-distance allowance is added</td></tr></tbody></table>
+</section>
+
+<section id="r19">
+  <h2>R19 — Report artisan sales</h2>
+  <p>A report summarizes orders and revenue for an artisan during a valid date range.</p>
+  <p class="muted"><b>Implementation:</b> <code>ReportService.artisanReport</code> &nbsp; <b>JUnit:</b> <code>ReportServiceTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Report artisan sales
+
+Scenario: Report sales for a valid period
+  Given an artisan has completed orders in the selected period
+  When a report is requested for that artisan and period
+  Then the report includes order count and revenue
+
+Scenario: Reject an invalid date range
+  Given the report start date is after its end date
+  When the report is requested
+  Then an invalid-period result is returned
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Valid report</td><td>Existing artisan and start date before end date</td><td>Order count and revenue are returned</td></tr><tr><td>Empty period</td><td>Valid date range with no matching orders</td><td>Report indicates no matching orders</td></tr><tr><td>Invalid period</td><td>Start date is after end date</td><td>Report request is rejected</td></tr></tbody></table>
+</section>
+
+<section id="r20">
+  <h2>R20 — Calculate customer loyalty tier</h2>
+  <p>A customer&#x27;s loyalty tier and associated discount are determined by the number of completed orders.</p>
+  <p class="muted"><b>Implementation:</b> <code>LoyaltyService.tierFor</code> &nbsp; <b>JUnit:</b> <code>WalletAndLoyaltyTest</code></p>
+  <h3>BDD scenarios</h3>
+  <pre>Feature: Calculate customer loyalty tier
+
+Scenario: Qualify for a higher tier
+  Given a customer has completed enough orders for the next tier
+  When the loyalty tier is calculated
+  Then the customer receives the matching tier and discount
+
+Scenario: Keep the base tier below the threshold
+  Given a customer has fewer completed orders than the first threshold
+  When the loyalty tier is calculated
+  Then the customer remains in the base tier
+</pre>
+  <h3>Black-box test design</h3>
+  <table><thead><tr><th>Technique / partition</th><th>Input</th><th>Expected result</th></tr></thead>
+  <tbody><tr><td>Base-tier boundary</td><td>Completed orders = 0</td><td>Base tier is returned</td></tr><tr><td>Tier threshold</td><td>Completed orders equal the next-tier threshold</td><td>Next tier and discount are returned</td></tr><tr><td>Negative count</td><td>Completed-order count is negative</td><td>Base tier is returned</td></tr></tbody></table>
+</section>
+
+<section id="run">
+  <h2>Execution</h2>
+  <p>Build and run the website from the repository root using JDK 17 or later:</p>
+  <pre>javac -cp lib/sqlite-jdbc.jar -d build $(find src -name '*.java')
+java -cp "build:lib/sqlite-jdbc.jar:lib/slf4j-api.jar" com.hirfa.web.WebServer handmade.db 8080</pre>
+  <p>Run the JUnit suite with the commands in <code>README.md</code>. Standalone Gherkin files are
+  generated under <code>features/R01.feature</code> through <code>R20.feature</code>.</p>
+</section>
+</main>
+<footer>Hirfa — Handmade Delivery Platform · SE430 Software Testing Project</footer>
+</body>
+</html>

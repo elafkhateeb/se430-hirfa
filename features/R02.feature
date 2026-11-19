@@ -1,11 +1,12 @@
-Feature: تسجيل دخول العميل
+Feature: Customer login
 
-Scenario: دخول ببيانات صحيحة
-Given حساب العميل "أمل الخطيب" مسجل بالبريد "amal@gmail.com" وكلمة المرور "Amal@2024"
-When طلب تسجيل الدخول
-Then تظهر رسالة "مرحباً بك مجدداً، أمل الخطيب"
+Scenario: Sign in with valid customer credentials
+  Given a customer account exists for "amal@example.com"
+  When the customer submits the correct password
+  Then the customer is signed in
+  And customer navigation is displayed
 
-Scenario: دخول بكلمة مرور خاطئة
-Given حساب يملك البريد "amal@gmail.com"
-When إدخال كلمة المرور "Wrong@123"
-Then يرفض النظام الدخول ويظهر "كلمة المرور غير صحيحة"
+Scenario: Reject an incorrect password
+  Given a customer account exists for "amal@example.com"
+  When the customer submits an incorrect password
+  Then sign-in is rejected

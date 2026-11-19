@@ -4,19 +4,28 @@ public class Artisan {
     public final int id;
     public String name;
     public String craft;
+    public String email;
+    public String password;
     public double ratingSum;
     public int ratingCount;
 
-<span class="fc" id="L10">    public Artisan(int id, String name, String craft, double ratingSum, int ratingCount) {</span>
-<span class="fc" id="L11">        this.id = id;</span>
-<span class="fc" id="L12">        this.name = name;</span>
-<span class="fc" id="L13">        this.craft = craft;</span>
-<span class="fc" id="L14">        this.ratingSum = ratingSum;</span>
-<span class="fc" id="L15">        this.ratingCount = ratingCount;</span>
-<span class="fc" id="L16">    }</span>
+    public Artisan(int id, String name, String craft, double ratingSum, int ratingCount) {
+<span class="fc" id="L13">        this(id, name, craft, null, null, ratingSum, ratingCount);</span>
+<span class="fc" id="L14">    }</span>
+
+    public Artisan(int id, String name, String craft, String email, String password,
+<span class="fc" id="L17">                   double ratingSum, int ratingCount) {</span>
+<span class="fc" id="L18">        this.id = id;</span>
+<span class="fc" id="L19">        this.name = name;</span>
+<span class="fc" id="L20">        this.craft = craft;</span>
+<span class="fc" id="L21">        this.email = email;</span>
+<span class="fc" id="L22">        this.password = password;</span>
+<span class="fc" id="L23">        this.ratingSum = ratingSum;</span>
+<span class="fc" id="L24">        this.ratingCount = ratingCount;</span>
+<span class="fc" id="L25">    }</span>
 
     public double rating() {
-<span class="fc bfc" id="L19" title="All 2 branches covered.">        return ratingCount == 0 ? 0 : Math.round((ratingSum / ratingCount) * 10.0) / 10.0;</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        return ratingCount == 0 ? 0 : Math.round((ratingSum / ratingCount) * 10.0) / 10.0;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

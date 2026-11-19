@@ -24,37 +24,64 @@ public class ArtisanServiceTest {
 
     @Test
     void register_validArtisan_created() {
-        Outcome out = service.register("نادية القادرية", "0793344556", "جلوديات");
+        Outcome out = service.register("Nadia Qadri", "0793344556", "Leather",
+                "nadia@example.com", "NadiaPass2026");
         assertTrue(out.ok());
-        assertTrue(out.message().contains("تم تسجيل"));
+        assertTrue(out.message().contains("Artisan account created"));
         assertEquals(4, (int) out.value());
     }
 
     @Test
+    void register_artisanAccount_canLogIn() {
+        Outcome registration = service.register("Nadia Qadri", "0793344556", "Leather",
+                "nadia@example.com", "NadiaPass2026");
+        assertTrue(registration.ok());
+        Outcome login = service.login("nadia@example.com", "NadiaPass2026");
+        assertTrue(login.ok());
+        assertEquals(registration.value(), login.value());
+    }
+
+    @Test
+    void register_artisanAccount_duplicateEmail_rejected() {
+        service.register("Nadia Qadri", "0793344556", "Leather", "nadia@example.com", "NadiaPass2026");
+        Outcome duplicate = service.register("Another Artisan", "0793344557", "Leather",
+                "nadia@example.com", "AnotherPass2026");
+        assertFalse(duplicate.ok());
+    }
+
+    @Test
+    void login_artisanAccount_wrongPassword_rejected() {
+        service.register("Nadia Qadri", "0793344556", "Leather", "nadia@example.com", "NadiaPass2026");
+        assertFalse(service.login("nadia@example.com", "WrongPass2026").ok());
+    }
+
+    @Test
     void register_missingName_rejected() {
-        assertFalse(service.register("", "0793344556", "صابون").ok());
+        assertFalse(service.register("", "0793344556", "Soap", "nadia@example.com", "NadiaPass2026").ok());
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"07933445561", "0713344556", "", "079334455"})
     void register_badPhone_rejected(String phone) {
-        assertFalse(service.register("نادية القادرية", phone, "صابون").ok());
+        assertFalse(service.register("Nadia Qadri", phone, "Soap", "nadia@example.com", "NadiaPass2026").ok());
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"طباعة", "ب instances", "", "keramik"})
+    @ValueSource(strings = {"Printing", "Paper Goods", "", "keramik"})
     void register_unknownCraft_rejected(String craft) {
-        assertFalse(service.register("نادية القادرية", "0793344556", craft).ok());
+        assertFalse(service.register("Nadia Qadri", "0793344556", craft,
+                "nadia@example.com", "NadiaPass2026").ok());
     }
 
     @Test
     void register_nullCraft_rejected() {
-        assertFalse(service.register("نادية القادرية", "0793344556", null).ok());
+        assertFalse(service.register("Nadia Qadri", "0793344556", null,
+                "nadia@example.com", "NadiaPass2026").ok());
     }
 
     @Test
     void rating_zeroRatings_showsZero() {
-        Artisan fresh = new Artisan(99, "لم تقيّم بعد", "صابون", 0, 0);
+        Artisan fresh = new Artisan(99, "Not Yet Rated", "Soap", 0, 0);
         assertEquals(0.0, fresh.rating());
     }
 
@@ -69,7 +96,7 @@ public class ArtisanServiceTest {
     void rateArtisan_zeroStars_rejected() {
         Outcome out = service.rateArtisan(1, 0);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("بين 1 و 5"));
+        assertTrue(out.message().contains("between 1 and 5"));
     }
 
     @Test
@@ -81,7 +108,7 @@ public class ArtisanServiceTest {
     void rateArtisan_unknownArtisan_rejected() {
         Outcome out = service.rateArtisan(99, 4);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("غير موجود"));
+        assertTrue(out.message().contains("not found"));
     }
 
 }

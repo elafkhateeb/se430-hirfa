@@ -1,11 +1,12 @@
-Feature: إتمام شراء الطلب
+Feature: Place an order
 
-Scenario: عميل يؤكد طلباً صحياً
-Given العميل "أمل الخطيب" لديها سلة بصابون زيت الغار x2 (7 دنانير) والمسافة 7 كم والدفع "CASH"
-When طلب تأكيد الشراء
-Then يحفظ النظام الطلب ويظهر "تم إنشاء الطلب رقم 1 بقيمة 9.0 دينار" (7 + 2.0 رسوم توصيل)
+Scenario: Place an order with valid details
+  Given a signed-in customer has a valid cart and delivery distance
+  When the customer confirms the order with cash on delivery
+  Then the order is stored with its items and calculated total
+  And the purchased stock is reserved
 
-Scenario: عميل يحاول الشراء والسلة فارغة
-Given سلة مشتريات فارغة
-When طلب تأكيد الشراء
-Then يرفض النظام ويظهر "السلة فارغة"
+Scenario: Reject an empty cart
+  Given a signed-in customer has an empty cart
+  When the customer confirms checkout
+  Then no order is created

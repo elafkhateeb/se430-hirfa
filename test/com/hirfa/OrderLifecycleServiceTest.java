@@ -17,7 +17,7 @@ public class OrderLifecycleServiceTest {
 
     @BeforeEach
     void setUp() {
-        order = new Order(1, List.of(new OrderItem(3, "صابون زيت الغار", 3.5, 2)), "CASH", 7,
+        order = new Order(1, List.of(new OrderItem(3, "Laurel Oil Soap", 3.5, 2)), "CASH", 7,
                 LocalDateTime.of(2026, 11, 8, 12, 0));
         order.fee = 2;
         order.total = 9.0;
@@ -28,7 +28,7 @@ public class OrderLifecycleServiceTest {
         LocalDateTime now = order.createdAt.plusMinutes(119);
         Outcome out = service.cancel(order, now);
         assertTrue(out.ok());
-        assertTrue(out.message().contains("تم إلغاء الطلب"));
+        assertTrue(out.message().contains("Order cancelled"));
     }
 
     @Test
@@ -42,7 +42,7 @@ public class OrderLifecycleServiceTest {
         LocalDateTime now = order.createdAt.plusMinutes(121);
         Outcome out = service.cancel(order, now);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("مدة الإلغاء"));
+        assertTrue(out.message().contains("cancellation window"));
     }
 
     @Test
@@ -50,7 +50,7 @@ public class OrderLifecycleServiceTest {
         order.status = Order.Status.DELIVERED;
         Outcome out = service.cancel(order, order.createdAt.plusMinutes(10));
         assertFalse(out.ok());
-        assertTrue(out.message().contains("لا يمكن إلغاء"));
+        assertTrue(out.message().contains("can no longer be cancelled"));
     }
 
     @Test
@@ -58,7 +58,7 @@ public class OrderLifecycleServiceTest {
         order = new Order(1, order.items, "WALLET", order.distanceKm, order.createdAt);
         Outcome out = service.cancel(order, order.createdAt.plusMinutes(30));
         assertTrue(out.ok());
-        assertTrue(out.message().contains("استرداد"));
+        assertTrue(out.message().contains("refunded"));
     }
 
     @Test
@@ -70,7 +70,7 @@ public class OrderLifecycleServiceTest {
         Outcome out = service.advance(order);
         assertTrue(out.ok());
         assertTrue(order.status == Order.Status.DELIVERED);
-        assertTrue(out.message().contains("التسليم"));
+        assertTrue(out.message().contains("Delivered"));
     }
 
     @Test
@@ -78,6 +78,6 @@ public class OrderLifecycleServiceTest {
         order.status = Order.Status.DELIVERED;
         Outcome out = service.advance(order);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("لا توجد حالة تالية"));
+        assertTrue(out.message().contains("no next order status"));
     }
 }

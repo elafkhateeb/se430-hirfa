@@ -1,11 +1,11 @@
-Feature: تقرير مبيعات الحرفي
+Feature: Report artisan sales
 
-Scenario: حساب إيراد حرفي خلال فترة
-Given الحرفي "ليان الزعبي" (رقم 2) مرتّبت طلباً يضم "صابون زيت الغار x2"
-When طلب تقرير الفترة من "2026-11-01" إلى "2026-11-30"
-Then التقرير: "إيراد 7.0 دينار من 1 طلب" وعدد القطع "2"
+Scenario: Report sales for a valid period
+  Given an artisan has completed orders in the selected period
+  When a report is requested for that artisan and period
+  Then the report includes order count and revenue
 
-Scenario: فترة بلا طلبات
-Given فترة لا تحوي أي طلب لهذا الحرفي
-When طلب التقرير
-Then يظهر "لا توجد طلبات ضمن الفترة المحددة"
+Scenario: Reject an invalid date range
+  Given the report start date is after its end date
+  When the report is requested
+  Then an invalid-period result is returned

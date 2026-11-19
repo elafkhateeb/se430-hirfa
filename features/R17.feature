@@ -1,11 +1,11 @@
-Feature: تعديل كمية منتج في السلة
+Feature: Change a cart quantity
 
-Scenario: العميل يعدّل الكمية المسموحة
-Given المنتج في السلة كميته "2"
-When تحديث الكمية إلى "4"
-Then يقبل النظام وتصير الكمية "4" ويظهر "صارت كمية المنتج في السلة 4"
+Scenario: Update a quantity within stock
+  Given a cart contains 1 item and 8 are in stock
+  When the customer changes the quantity to 4
+  Then the cart contains 4 items
 
-Scenario: العميل يطلب كمية فوق الحد
-Given طلب كمية "6"
-When تحديث الكمية
-Then يرفض النظام ويظهر "الكمية المسموحة من 1 إلى 5"
+Scenario: Reject a quantity above current stock
+  Given a cart contains 1 item and 3 are in stock
+  When the customer changes the quantity to 4
+  Then the cart remains unchanged

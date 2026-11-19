@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Repo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">JaCoCo Coverage Report</a> &gt; <a href="index.source.html" class="el_package">com.hirfa.repo</a> &gt; <span class="el_source">Repo.java</span></div><h1>Repo.java</h1><pre class="source lang-java linenums">package com.hirfa.repo;
+
+import com.hirfa.model.*;
+import java.sql.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Repo implements AutoCloseable {
+    private final Connection conn;
+
+<span class="fc" id="L12">    public Repo(String path) {</span>
+        try {
+<span class="fc" id="L14">            conn = DriverManager.getConnection(&quot;jdbc:sqlite:&quot; + path);</span>
+<span class="fc" id="L15">            try (Statement st = conn.createStatement()) {</span>
+<span class="fc" id="L16">                st.execute(&quot;CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT, email TEXT UNIQUE, password TEXT, wallet REAL, orders_count INTEGER)&quot;);</span>
+<span class="fc" id="L17">                st.execute(&quot;CREATE TABLE IF NOT EXISTS artisans(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, craft TEXT, email TEXT UNIQUE, password TEXT, rating_sum REAL, rating_count INTEGER)&quot;);</span>
+<span class="fc" id="L18">                st.execute(&quot;CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT, artisan_id INTEGER, name TEXT, craft TEXT, price REAL, stock INTEGER)&quot;);</span>
+<span class="fc" id="L19">                st.execute(&quot;CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, payment TEXT, distance REAL, created_at TEXT, status TEXT, subtotal REAL, fee REAL, discount REAL, total REAL)&quot;);</span>
+<span class="fc" id="L20">                st.execute(&quot;CREATE TABLE IF NOT EXISTS order_items(order_id INTEGER, position INTEGER, product_id INTEGER, name TEXT, unit_price REAL, qty INTEGER)&quot;);</span>
+            }
+<span class="fc" id="L22">            addColumnIfMissing(&quot;artisans&quot;, &quot;email&quot;, &quot;TEXT&quot;);</span>
+<span class="fc" id="L23">            addColumnIfMissing(&quot;artisans&quot;, &quot;password&quot;, &quot;TEXT&quot;);</span>
+<span class="fc" id="L24">            try (Statement st = conn.createStatement()) {</span>
+<span class="fc" id="L25">                st.execute(&quot;CREATE UNIQUE INDEX IF NOT EXISTS artisans_email_unique ON artisans(email) WHERE email IS NOT NULL&quot;);</span>
+            }
+<span class="nc" id="L27">        } catch (SQLException e) {</span>
+<span class="nc" id="L28">            throw new IllegalStateException(e);</span>
+<span class="fc" id="L29">        }</span>
+<span class="fc" id="L30">    }</span>
+
+    public void seed() {
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (!artisans().isEmpty()) return;</span>
+<span class="fc" id="L34">        int samia = insertArtisan(new Artisan(0, &quot;Samia Al-Majali&quot;, &quot;Embroidery&quot;, 12, 3));</span>
+<span class="fc" id="L35">        int layan = insertArtisan(new Artisan(0, &quot;Layan Al-Zubi&quot;, &quot;Soap&quot;, 9, 2));</span>
+<span class="fc" id="L36">        int mohammad = insertArtisan(new Artisan(0, &quot;Mohammad Al-Omari&quot;, &quot;Woodwork&quot;, 5, 1));</span>
+<span class="fc" id="L37">        insertProduct(new Product(0, samia, &quot;Embroidered Chair Cover&quot;, &quot;Embroidery&quot;, 15, 8));</span>
+<span class="fc" id="L38">        insertProduct(new Product(0, samia, &quot;Fellahi Embroidery Cushion&quot;, &quot;Embroidery&quot;, 22.5, 4));</span>
+<span class="fc" id="L39">        insertProduct(new Product(0, layan, &quot;Laurel Oil Soap&quot;, &quot;Soap&quot;, 3.5, 30));</span>
+<span class="fc" id="L40">        insertProduct(new Product(0, layan, &quot;Nigella Seed Soap&quot;, &quot;Soap&quot;, 4, 0));</span>
+<span class="fc" id="L41">        insertProduct(new Product(0, mohammad, &quot;Carved Wooden Sculpture&quot;, &quot;Woodwork&quot;, 45, 6));</span>
+<span class="fc" id="L42">    }</span>
+
+    public int insertCustomer(Customer c) {
+<span class="fc" id="L45">        return insert(&quot;INSERT INTO customers(name,phone,email,password,wallet,orders_count) VALUES(?,?,?,?,?,?)&quot;,</span>
+<span class="fc" id="L46">                c.name, c.phone, c.email, c.password, c.wallet, c.ordersCount);</span>
+    }
+
+    public int insertArtisan(Artisan a) {
+<span class="fc" id="L50">        return insert(&quot;INSERT INTO artisans(name,craft,email,password,rating_sum,rating_count) VALUES(?,?,?,?,?,?)&quot;,</span>
+<span class="fc" id="L51">                a.name, a.craft, a.email, a.password, a.ratingSum, a.ratingCount);</span>
+    }
+
+    public int insertProduct(Product p) {
+<span class="fc" id="L55">        return insert(&quot;INSERT INTO products(artisan_id,name,craft,price,stock) VALUES(?,?,?,?,?)&quot;,</span>
+<span class="fc" id="L56">                p.artisanId, p.name, p.craft, p.price, p.stock);</span>
+    }
+
+    public void saveProduct(Product p) {
+<span class="fc" id="L60">        update(&quot;UPDATE products SET name=?, craft=?, price=?, stock=? WHERE id=?&quot;, p.name, p.craft, p.price, p.stock, p.id);</span>
+<span class="fc" id="L61">    }</span>
+
+    public void saveCustomer(Customer c) {
+<span class="fc" id="L64">        update(&quot;UPDATE customers SET name=?, phone=?, email=?, password=?, wallet=?, orders_count=? WHERE id=?&quot;,</span>
+<span class="fc" id="L65">                c.name, c.phone, c.email, c.password, c.wallet, c.ordersCount, c.id);</span>
+<span class="fc" id="L66">    }</span>
+
+    public Customer customer(int id) {
+<span class="fc" id="L69">        return queryOne(&quot;SELECT * FROM customers WHERE id=?&quot;, Repo::customerMapper, id);</span>
+    }
+
+    public Customer customerByEmail(String email) {
+<span class="fc" id="L73">        return queryOne(&quot;SELECT * FROM customers WHERE email=?&quot;, Repo::customerMapper, email);</span>
+    }
+
+    private static Customer customerMapper(ResultSet rs) throws SQLException {
+<span class="fc" id="L77">        return new Customer(rs.getInt(&quot;id&quot;), rs.getString(&quot;name&quot;), rs.getString(&quot;phone&quot;),</span>
+<span class="fc" id="L78">                rs.getString(&quot;email&quot;), rs.getString(&quot;password&quot;), rs.getDouble(&quot;wallet&quot;), rs.getInt(&quot;orders_count&quot;));</span>
+    }
+
+    public Artisan artisan(int id) {
+<span class="fc" id="L82">        return queryOne(&quot;SELECT * FROM artisans WHERE id=?&quot;, Repo::artisanMapper, id);</span>
+    }
+
+    private static Artisan artisanMapper(ResultSet rs) throws SQLException {
+<span class="fc" id="L86">        return new Artisan(rs.getInt(&quot;id&quot;), rs.getString(&quot;name&quot;), rs.getString(&quot;craft&quot;),</span>
+<span class="fc" id="L87">                rs.getString(&quot;email&quot;), rs.getString(&quot;password&quot;),</span>
+<span class="fc" id="L88">                rs.getDouble(&quot;rating_sum&quot;), rs.getInt(&quot;rating_count&quot;));</span>
+    }
+
+    public Artisan artisanByEmail(String email) {
+<span class="fc" id="L92">        return queryOne(&quot;SELECT * FROM artisans WHERE email=?&quot;, Repo::artisanMapper, email);</span>
+    }
+
+    public void rateArtisan(int artisanId, int stars) {
+<span class="fc" id="L96">        update(&quot;UPDATE artisans SET rating_sum=rating_sum+?, rating_count=rating_count+1 WHERE id=?&quot;, stars, artisanId);</span>
+<span class="fc" id="L97">    }</span>
+
+    public Product product(int id) {
+<span class="fc" id="L100">        return queryOne(&quot;SELECT * FROM products WHERE id=?&quot;, Repo::productMapper, id);</span>
+    }
+
+    public List&lt;Product&gt; products() {
+<span class="fc" id="L104">        return queryList(&quot;SELECT * FROM products ORDER BY id&quot;, Repo::productMapper);</span>
+    }
+
+    public List&lt;Product&gt; productsByCraft(String craft) {
+<span class="nc" id="L108">        return queryList(&quot;SELECT * FROM products WHERE craft=? ORDER BY id&quot;, Repo::productMapper, craft);</span>
+    }
+
+    private static Product productMapper(ResultSet rs) throws SQLException {
+<span class="fc" id="L112">        return new Product(rs.getInt(&quot;id&quot;), rs.getInt(&quot;artisan_id&quot;), rs.getString(&quot;name&quot;),</span>
+<span class="fc" id="L113">                rs.getString(&quot;craft&quot;), rs.getDouble(&quot;price&quot;), rs.getInt(&quot;stock&quot;));</span>
+    }
+
+    public int createOrder(Order o) {
+<span class="fc" id="L117">        int id = insert(&quot;INSERT INTO orders(customer_id,payment,distance,created_at,status,subtotal,fee,discount,total) VALUES(?,?,?,?,?,?,?,?,?)&quot;,</span>
+<span class="fc" id="L118">                o.customerId, o.payment, o.distanceKm, o.createdAt.toString(), o.status.name(), o.subtotal, o.fee, o.discount, o.total);</span>
+<span class="fc" id="L119">        List&lt;OrderItem&gt; items = o.items;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (int i = 0; i &lt; items.size(); i++) {</span>
+<span class="fc" id="L121">            OrderItem it = items.get(i);</span>
+<span class="fc" id="L122">            update(&quot;INSERT INTO order_items(order_id,position,product_id,name,unit_price,qty) VALUES(?,?,?,?,?,?)&quot;,</span>
+<span class="fc" id="L123">                    id, i + 1, it.productId(), it.name(), it.unitPrice(), it.qty());</span>
+        }
+<span class="fc" id="L125">        return id;</span>
+    }
+
+    public Order order(int id) {
+<span class="fc" id="L129">        List&lt;OrderItem&gt; items = queryList(&quot;SELECT * FROM order_items WHERE order_id=? ORDER BY position&quot;,</span>
+                rs -&gt; {
+                    try {
+<span class="fc" id="L132">                        return new OrderItem(rs.getInt(&quot;product_id&quot;), rs.getString(&quot;name&quot;), rs.getDouble(&quot;unit_price&quot;), rs.getInt(&quot;qty&quot;));</span>
+<span class="nc" id="L133">                    } catch (SQLException e) {</span>
+<span class="nc" id="L134">                        throw new IllegalStateException(e);</span>
+                    }
+<span class="fc" id="L136">                }, id);</span>
+<span class="fc" id="L137">        return queryOne(&quot;SELECT * FROM orders WHERE id=?&quot;, rs -&gt; {</span>
+            try {
+<span class="fc" id="L139">                return new Order(id, rs.getInt(&quot;customer_id&quot;), items, rs.getString(&quot;payment&quot;), rs.getDouble(&quot;distance&quot;),</span>
+<span class="fc" id="L140">                        LocalDateTime.parse(rs.getString(&quot;created_at&quot;)), rs.getDouble(&quot;subtotal&quot;), rs.getDouble(&quot;fee&quot;),</span>
+<span class="fc" id="L141">                        rs.getDouble(&quot;discount&quot;), rs.getDouble(&quot;total&quot;), Order.Status.valueOf(rs.getString(&quot;status&quot;)));</span>
+<span class="nc" id="L142">            } catch (SQLException e) {</span>
+<span class="nc" id="L143">                throw new IllegalStateException(e);</span>
+            }
+<span class="fc" id="L145">        }, id);</span>
+    }
+
+    public void updateStatus(int orderId, Order.Status status) {
+<span class="fc" id="L149">        update(&quot;UPDATE orders SET status=? WHERE id=?&quot;, status.name(), orderId);</span>
+<span class="fc" id="L150">    }</span>
+
+public List&lt;Artisan&gt; artisans() {
+<span class="fc" id="L153">        return queryList(&quot;SELECT * FROM artisans ORDER BY id&quot;, Repo::artisanMapper);</span>
+    }
+
+    private void addColumnIfMissing(String table, String column, String type) throws SQLException {
+<span class="fc" id="L157">        try (Statement st = conn.createStatement();</span>
+<span class="fc" id="L158">             ResultSet rs = st.executeQuery(&quot;PRAGMA table_info(&quot; + table + &quot;)&quot;)) {</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            while (rs.next()) {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                if (column.equalsIgnoreCase(rs.getString(&quot;name&quot;))) return;</span>
+            }
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">        }</span>
+<span class="nc" id="L163">        try (Statement st = conn.createStatement()) {</span>
+<span class="nc" id="L164">            st.execute(&quot;ALTER TABLE &quot; + table + &quot; ADD COLUMN &quot; + column + &quot; &quot; + type);</span>
+        }
+<span class="nc" id="L166">    }</span>
+
+    public List&lt;Order&gt; ordersByCustomer(int customerId) {
+<span class="fc" id="L169">        List&lt;Order&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L170">        try (PreparedStatement ps = conn.prepareStatement(&quot;SELECT id FROM orders WHERE customer_id=? ORDER BY id DESC&quot;)) {</span>
+<span class="fc" id="L171">            ps.setInt(1, customerId);</span>
+<span class="fc" id="L172">            try (ResultSet rs = ps.executeQuery()) {</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">                while (rs.next()) list.add(order(rs.getInt(1)));</span>
+            }
+<span class="nc" id="L175">        } catch (SQLException e) {</span>
+<span class="nc" id="L176">            throw new IllegalStateException(e);</span>
+<span class="fc" id="L177">        }</span>
+<span class="fc" id="L178">        return list;</span>
+    }
+
+    public List&lt;Integer&gt; orderIdsBetween(LocalDateTime from, LocalDateTime to) {
+<span class="fc" id="L182">        List&lt;Integer&gt; ids = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L183">        try (PreparedStatement ps = conn.prepareStatement(&quot;SELECT id FROM orders WHERE created_at&gt;=? AND created_at&lt;=? ORDER BY id&quot;)) {</span>
+<span class="fc" id="L184">            ps.setString(1, from.toString());</span>
+<span class="fc" id="L185">            ps.setString(2, to.toString());</span>
+<span class="fc" id="L186">            try (ResultSet rs = ps.executeQuery()) {</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                while (rs.next()) ids.add(rs.getInt(1));</span>
+            }
+<span class="nc" id="L189">        } catch (SQLException e) {</span>
+<span class="nc" id="L190">            throw new IllegalStateException(e);</span>
+<span class="fc" id="L191">        }</span>
+<span class="fc" id="L192">        return ids;</span>
+    }
+
+    private int insert(String sql, Object... params) {
+<span class="fc" id="L196">        try (PreparedStatement ps = conn.prepareStatement(sql)) {</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            for (int i = 0; i &lt; params.length; i++) ps.setObject(i + 1, params[i]);</span>
+<span class="fc" id="L198">            ps.executeUpdate();</span>
+<span class="fc" id="L199">            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(&quot;SELECT last_insert_rowid()&quot;)) {</span>
+<span class="fc" id="L200">                rs.next();</span>
+<span class="fc" id="L201">                return rs.getInt(1);</span>
+            }
+<span class="nc" id="L203">        } catch (SQLException e) {</span>
+<span class="nc" id="L204">            throw new IllegalStateException(e);</span>
+        }
+    }
+
+    public int update(String sql, Object... params) {
+<span class="fc" id="L209">        try (PreparedStatement ps = conn.prepareStatement(sql)) {</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            for (int i = 0; i &lt; params.length; i++) ps.setObject(i + 1, params[i]);</span>
+<span class="fc" id="L211">            return ps.executeUpdate();</span>
+<span class="nc" id="L212">        } catch (SQLException e) {</span>
+<span class="nc" id="L213">            throw new IllegalStateException(e);</span>
+        }
+    }
+
+    private &lt;T&gt; T queryOne(String sql, SqlMapper&lt;T&gt; m, Object... params) {
+<span class="fc" id="L218">        try (PreparedStatement ps = conn.prepareStatement(sql)) {</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            for (int i = 0; i &lt; params.length; i++) ps.setObject(i + 1, params[i]);</span>
+<span class="fc" id="L220">            try (ResultSet rs = ps.executeQuery()) {</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                return rs.next() ? m.map(rs) : null;</span>
+            }
+<span class="nc" id="L223">        } catch (SQLException e) {</span>
+<span class="nc" id="L224">            throw new IllegalStateException(e);</span>
+        }
+    }
+
+    private &lt;T&gt; List&lt;T&gt; queryList(String sql, SqlMapper&lt;T&gt; m, Object... params) {
+<span class="fc" id="L229">        List&lt;T&gt; out = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L230">        try (PreparedStatement ps = conn.prepareStatement(sql)) {</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            for (int i = 0; i &lt; params.length; i++) ps.setObject(i + 1, params[i]);</span>
+<span class="fc" id="L232">            try (ResultSet rs = ps.executeQuery()) {</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                while (rs.next()) out.add(m.map(rs));</span>
+            }
+<span class="nc" id="L235">        } catch (SQLException e) {</span>
+<span class="nc" id="L236">            throw new IllegalStateException(e);</span>
+<span class="fc" id="L237">        }</span>
+<span class="fc" id="L238">        return out;</span>
+    }
+
+    @FunctionalInterface
+    private interface SqlMapper&lt;T&gt; {
+        T map(ResultSet rs) throws SQLException;
+    }
+
+    @Override
+    public void close() {
+        try {
+<span class="fc" id="L249">            conn.close();</span>
+<span class="nc" id="L250">        } catch (SQLException e) {</span>
+<span class="nc" id="L251">            throw new IllegalStateException(e);</span>
+<span class="fc" id="L252">        }</span>
+<span class="fc" id="L253">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

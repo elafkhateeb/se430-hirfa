@@ -8,32 +8,32 @@ import java.time.LocalDateTime;
     public static final int CANCEL_WINDOW_MINUTES = 120;
 
     public Outcome cancel(Order order, LocalDateTime now) {
-<span class="fc bfc" id="L11" title="All 2 branches covered.">        if (order.status != Order.Status.NEW) return Outcome.fail(&quot;لا يمكن إلغاء الطلب في هذه المرحلة&quot;);</span>
+<span class="fc bfc" id="L11" title="All 2 branches covered.">        if (order.status != Order.Status.NEW) return Outcome.fail(&quot;This order can no longer be cancelled.&quot;);</span>
 <span class="fc" id="L12">        long minutes = java.time.Duration.between(order.createdAt, now).toMinutes();</span>
-<span class="fc bfc" id="L13" title="All 2 branches covered.">        if (minutes &gt; CANCEL_WINDOW_MINUTES) return Outcome.fail(&quot;انتهت مدة الإلغاء (ساعتان)&quot;);</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        if (minutes &gt; CANCEL_WINDOW_MINUTES) return Outcome.fail(&quot;The two-hour cancellation window has expired.&quot;);</span>
 <span class="fc" id="L14">        order.status = Order.Status.CANCELLED;</span>
 <span class="fc bfc" id="L15" title="All 2 branches covered.">        if (order.payment.equals(&quot;WALLET&quot;)) {</span>
-<span class="fc" id="L16">            return Outcome.ok(&quot;تم إلغاء الطلب واسترداد &quot; + order.total + &quot; دينار إلى المحفظة&quot;, order.total);</span>
+<span class="fc" id="L16">            return Outcome.ok(&quot;Order cancelled; &quot; + order.total + &quot; JOD refunded to the wallet.&quot;, order.total);</span>
         }
-<span class="fc" id="L18">        return Outcome.ok(&quot;تم إلغاء الطلب&quot;, order.total);</span>
+<span class="fc" id="L18">        return Outcome.ok(&quot;Order cancelled.&quot;, order.total);</span>
     }
 
     public Outcome advance(Order order) {
 <span class="fc bfc" id="L22" title="All 4 branches covered.">        switch (order.status) {</span>
             case NEW -&gt; {
 <span class="fc" id="L24">                order.status = Order.Status.PREPARING;</span>
-<span class="fc" id="L25">                return Outcome.ok(&quot;أصبحت حالة الطلب: قيد التحضير&quot;);</span>
+<span class="fc" id="L25">                return Outcome.ok(&quot;Order status: Preparing.&quot;);</span>
             }
             case PREPARING -&gt; {
 <span class="fc" id="L28">                order.status = Order.Status.SHIPPING;</span>
-<span class="fc" id="L29">                return Outcome.ok(&quot;أصبحت حالة الطلب: قيد التوصيل&quot;);</span>
+<span class="fc" id="L29">                return Outcome.ok(&quot;Order status: Out for delivery.&quot;);</span>
             }
             case SHIPPING -&gt; {
 <span class="fc" id="L32">                order.status = Order.Status.DELIVERED;</span>
-<span class="fc" id="L33">                return Outcome.ok(&quot;أصبحت حالة الطلب: تم التسليم&quot;);</span>
+<span class="fc" id="L33">                return Outcome.ok(&quot;Order status: Delivered.&quot;);</span>
             }
             default -&gt; {
-<span class="fc" id="L36">                return Outcome.fail(&quot;لا توجد حالة تالية&quot;);</span>
+<span class="fc" id="L36">                return Outcome.fail(&quot;There is no next order status.&quot;);</span>
             }
         }
     }

@@ -1,16 +1,11 @@
-Feature: تنفيذ الدفع للطلب
+Feature: Process payment
 
-Scenario: دفع نقدي ضمن الحد
-Given طريقة الدفع "CASH" والقيمة "500" دينار
-When طلب الدفع
-Then يقبل النظام ويظهر "الدفع نقداً عند التسليم"
+Scenario: Pay with a valid card
+  Given a customer has a valid card number
+  When the customer submits a card payment
+  Then the payment is confirmed
 
-Scenario: دفع بالبطاقة برقم صحيح
-Given طريقة الدفع "CARD" ورقم البطاقة "4539148803436467"
-When طلب الدفع
-Then يقبل النظام ويظهر "تم تأكيد الدفع بالبطاقة"
-
-Scenario: دفع بالمحفظة برصيد كافٍ
-Given رصيد المحفظة "35" دينار والقيمة "30" دينار
-When طلب الدفع
-Then يقبل النظام ويظهر "تم الدفع من المحفظة"
+Scenario: Reject an invalid card number
+  Given a customer submits a card number with fewer than 16 digits
+  When the payment is processed
+  Then the payment is rejected

@@ -4,7 +4,7 @@ import java.util.List;
 
 public class ValidationService {
     public boolean validName(String name) {
-        return name != null && !name.isBlank();
+        return name != null && name.trim().matches("[A-Za-z][A-Za-z .'-]*");
     }
 
     public boolean validPhone(String phone) {
@@ -17,12 +17,12 @@ public class ValidationService {
 
     public boolean validPassword(String password) {
         return password != null && password.length() >= 8
-                && password.matches(".*[a-zA-Z\\u0600-\\u06FF].*")
+                && password.matches(".*[a-zA-Z].*")
                 && password.matches(".*\\d.*");
     }
 
     public boolean validCraft(String craft) {
         if (craft == null) return false;
-        return List.of("تطريز", "صابون", "خشبيات", "جلوديات", "سيراميك", "مجوهرات").contains(craft);
+        return List.of("Embroidery", "Soap", "Woodwork", "Leather", "Ceramics", "Jewelry").contains(craft);
     }
 }

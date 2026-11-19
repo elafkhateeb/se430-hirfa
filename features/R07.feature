@@ -1,11 +1,11 @@
-Feature: إضافة منتج إلى سلة المشتريات
+Feature: Add a product to the cart
 
-Scenario: عميل يضيف منتجاً متوفراً للسلة
-Given المنتج "صابون زيت الغار" (رقم 3) متوفر بمخزون "30"
-When طلب إضافة كمية "2" للسلة
-Then تضاف الكمية للسلة وتظهر "تمت إضافة صابون زيت الغار x2 إلى السلة"
+Scenario: Add an in-stock item
+  Given a product has 12 items in stock
+  When a customer adds 2 items to the cart
+  Then the cart contains 2 of that product
 
-Scenario: عميل يضيف كمية فوق الحد المسموح
-Given كمية الطلب "6" أكبر من الحد المسموح (5)
-When طلب الإضافة
-Then يرفض النظام ويظهر "الحد الأقصى 5 قطع من كل منتج في السلة"
+Scenario: Reject a quantity above the per-product limit
+  Given a product has 12 items in stock
+  When a customer tries to add 6 items
+  Then the cart is unchanged

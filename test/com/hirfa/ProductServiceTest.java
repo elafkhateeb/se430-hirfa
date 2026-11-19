@@ -24,48 +24,53 @@ public class ProductServiceTest {
 
     @Test
     void add_validProduct_created() {
-        Outcome out = service.add(3, "خاتم نحاسي مخرم", "مجوهرات", 12.5, 10);
+        Outcome out = service.add(1, "Copper Ring", "Embroidery", 12.5, 10);
         assertTrue(out.ok());
         assertEquals(6, (int) out.value());
     }
 
     @Test
     void add_missingName_rejected() {
-        assertFalse(service.add(3, "", "مجوهرات", 10, 5).ok());
+        assertFalse(service.add(1, "", "Embroidery", 10, 5).ok());
     }
 
     @Test
     void add_unknownCraft_rejected() {
-        assertFalse(service.add(3, "خاتم نحاسي مخرم", "ورقيات", 10, 5).ok());
+        assertFalse(service.add(1, "Copper Ring", "Paper Goods", 10, 5).ok());
+    }
+
+    @Test
+    void add_craftDifferentFromArtisanProfile_rejected() {
+        assertFalse(service.add(1, "Laurel Soap", "Soap", 10, 5).ok());
     }
 
     @Test
     void add_zeroPrice_rejected() {
-        Outcome out = service.add(3, "خاتم نحاسي مخرم", "مجوهرات", 0, 5);
+        Outcome out = service.add(1, "Copper Ring", "Embroidery", 0, 5);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("أكبر من صفر"));
+        assertTrue(out.message().contains("greater than 0"));
     }
 
     @Test
     void add_overMaxPrice_rejected() {
-        Outcome out = service.add(3, "خاتم نحاسي مخرم", "مجوهرات", 1000.01, 5);
+        Outcome out = service.add(1, "Copper Ring", "Embroidery", 1000.01, 5);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("1000 دينار"));
+        assertTrue(out.message().contains("1000 JOD"));
     }
 
     @Test
     void add_negativeStock_rejected() {
-        assertFalse(service.add(3, "خاتم نحاسي مخرم", "مجوهرات", 10, -1).ok());
+        assertFalse(service.add(1, "Copper Ring", "Embroidery", 10, -1).ok());
     }
 
     @Test
     void add_overMaxStock_rejected() {
-        assertFalse(service.add(3, "خاتم نحاسي مخرم", "مجوهرات", 10, 501).ok());
+        assertFalse(service.add(1, "Copper Ring", "Embroidery", 10, 501).ok());
     }
 
     @Test
     void add_nullCraft_rejected() {
-        assertFalse(service.add(3, "خاتم نحاسي مخرم", null, 10, 5).ok());
+        assertFalse(service.add(1, "Copper Ring", null, 10, 5).ok());
     }
 
     @Test
@@ -79,7 +84,7 @@ public class ProductServiceTest {
     void restock_unknownProduct_rejected() {
         Outcome out = service.restock(99, 5);
         assertFalse(out.ok());
-        assertTrue(out.message().contains("غير موجود"));
+        assertTrue(out.message().contains("not found"));
     }
 
     @Test
@@ -93,10 +98,15 @@ public class ProductServiceTest {
     }
 
     @Test
+    void restock_integerOverflow_rejected() {
+        assertFalse(service.restock(3, Integer.MAX_VALUE).ok());
+    }
+
+    @Test
     void search_byCraftOnly_returnsOnlyThatCraft() {
-        List<Product> out = service.search("صابون", null);
+        List<Product> out = service.search("Soap", null);
         assertEquals(2, out.size());
-        assertTrue(out.stream().allMatch(p -> p.craft.equals("صابون")));
+        assertTrue(out.stream().allMatch(p -> p.craft.equals("Soap")));
     }
 
     @Test
@@ -113,8 +123,8 @@ public class ProductServiceTest {
 
     @Test
     void search_byCraftAndPrice_combined() {
-        List<Product> out = service.search("تطريز", 20.0);
+        List<Product> out = service.search("Embroidery", 20.0);
         assertEquals(1, out.size());
-        assertEquals("مفرش كرسي مطرز", out.get(0).name);
+        assertEquals("Embroidered Chair Cover", out.get(0).name);
     }
 }

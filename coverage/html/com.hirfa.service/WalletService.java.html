@@ -14,11 +14,11 @@ public class WalletService {
 <span class="fc" id="L14">    }</span>
 
     public Outcome topUp(Customer customer, double amount) {
-<span class="fc bfc" id="L17" title="All 2 branches covered.">        if (amount &lt; MIN_TOPUP) return Outcome.fail(&quot;أقل قيمة شحن هي دينار واحد&quot;);</span>
-<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (amount &gt; MAX_TOPUP) return Outcome.fail(&quot;أقصى قيمة شحن هي 1000 دينار&quot;);</span>
+<span class="pc bpc" id="L17" title="1 of 4 branches missed.">        if (!Double.isFinite(amount) || amount &lt; MIN_TOPUP) return Outcome.fail(&quot;Minimum top-up is 1 JOD.&quot;);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (amount &gt; MAX_TOPUP) return Outcome.fail(&quot;Maximum top-up is 1000 JOD.&quot;);</span>
 <span class="fc" id="L19">        customer.wallet = round(customer.wallet + amount);</span>
 <span class="fc" id="L20">        repo.saveCustomer(customer);</span>
-<span class="fc" id="L21">        return new Outcome(true, &quot;تم شحن المحفظة، الرصيد الحالي &quot; + customer.wallet + &quot; دينار&quot;, customer.wallet);</span>
+<span class="fc" id="L21">        return new Outcome(true, &quot;Wallet topped up. Current balance: &quot; + customer.wallet + &quot; JOD.&quot;, customer.wallet);</span>
     }
 
     private double round(double v) {

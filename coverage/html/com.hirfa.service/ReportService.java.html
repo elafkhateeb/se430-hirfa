@@ -16,7 +16,7 @@ public class ReportService {
     }
 
     public ArtisanReport artisanReport(int artisanId, LocalDateTime from, LocalDateTime to) {
-<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (from.isAfter(to)) return new ArtisanReport(0, 0, 0, &quot;الفترة غير صحيحة&quot;);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (from.isAfter(to)) return new ArtisanReport(0, 0, 0, &quot;Invalid report period.&quot;);</span>
 <span class="fc" id="L20">        double revenue = 0;</span>
 <span class="fc" id="L21">        int ordersCount = 0;</span>
 <span class="fc" id="L22">        int itemsCount = 0;</span>
@@ -32,8 +32,8 @@ public class ReportService {
 <span class="fc" id="L32">            }</span>
 <span class="fc bfc" id="L33" title="All 2 branches covered.">            if (artisanInOrder) ordersCount++;</span>
 <span class="fc" id="L34">        }</span>
-<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (ordersCount == 0) return new ArtisanReport(0, 0, 0, &quot;لا توجد طلبات ضمن الفترة المحددة&quot;);</span>
-<span class="fc" id="L36">        String msg = &quot;إيراد &quot; + revenue + &quot; دينار من &quot; + ordersCount + &quot; طلب&quot;;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (ordersCount == 0) return new ArtisanReport(0, 0, 0, &quot;No orders were found in the selected period.&quot;);</span>
+<span class="fc" id="L36">        String msg = &quot;Revenue: &quot; + revenue + &quot; JOD from &quot; + ordersCount + &quot; orders.&quot;;</span>
 <span class="fc" id="L37">        return new ArtisanReport(revenue, ordersCount, itemsCount, msg);</span>
     }
 }

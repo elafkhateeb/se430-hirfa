@@ -1,11 +1,11 @@
-Feature: تقييم الحرفي
+Feature: Rate an artisan
 
-Scenario: عميل يقيّم حرفياً بعد التسليم
-Given الحرفي "سمية المجالي" (رقم 1) بتقييم متوسط 4.0
-When إضافة تقييم "5" نجوم
-Then يعدّل النظام المتوسط إلى "4.3" ويظهر "شكراً لتقييمك، متوسط تقييم سمية المجالي صار 4.3"
+Scenario: Submit a valid rating
+  Given an artisan profile is available
+  When a customer submits 5 stars
+  Then the rating count and average are updated
 
-Scenario: تقييم بست نجوم (فوق الحد)
-Given تقييم "6"
-When طلب التقييم
-Then يرفض النظام ويظهر "التقييم يجب أن يكون بين 1 و 5"
+Scenario: Reject a rating outside the supported range
+  Given an artisan profile is available
+  When a customer submits 6 stars
+  Then the rating is rejected

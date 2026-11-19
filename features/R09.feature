@@ -1,11 +1,11 @@
-Feature: حساب رسوم توصيل الطلب
+Feature: Calculate delivery fees
 
-Scenario: شحن مجاني للطلبات الكبيرة
-Given قيمة الطلب "105" دنانير والمسافة "7" كم
-When حساب الرسوم
-Then كانت الرسوم "0.0" دينار
+Scenario: Apply a distance-based fee
+  Given an order subtotal is below the free-delivery threshold
+  When the delivery distance is 7 kilometers
+  Then the fee for the matching distance band is charged
 
-Scenario: رسوم حسب المسافة
-Given قيمة الطلب "50" دنانير والمسافة "15" كم
-When حساب الرسوم
-Then تكون الرسوم "2.0" دينار
+Scenario: Waive the fee for a qualifying order
+  Given an order subtotal is at least 100 JOD
+  When delivery fees are calculated
+  Then the delivery fee is 0 JOD

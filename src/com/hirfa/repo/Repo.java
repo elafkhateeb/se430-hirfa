@@ -14,10 +14,15 @@ public class Repo implements AutoCloseable {
             conn = DriverManager.getConnection("jdbc:sqlite:" + path);
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT, email TEXT UNIQUE, password TEXT, wallet REAL, orders_count INTEGER)");
-                st.execute("CREATE TABLE IF NOT EXISTS artisans(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, craft TEXT, rating_sum REAL, rating_count INTEGER)");
+                st.execute("CREATE TABLE IF NOT EXISTS artisans(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, craft TEXT, email TEXT UNIQUE, password TEXT, rating_sum REAL, rating_count INTEGER)");
                 st.execute("CREATE TABLE IF NOT EXISTS products(id INTEGER PRIMARY KEY AUTOINCREMENT, artisan_id INTEGER, name TEXT, craft TEXT, price REAL, stock INTEGER)");
                 st.execute("CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, payment TEXT, distance REAL, created_at TEXT, status TEXT, subtotal REAL, fee REAL, discount REAL, total REAL)");
                 st.execute("CREATE TABLE IF NOT EXISTS order_items(order_id INTEGER, position INTEGER, product_id INTEGER, name TEXT, unit_price REAL, qty INTEGER)");
+            }
+            addColumnIfMissing("artisans", "email", "TEXT");
+            addColumnIfMissing("artisans", "password", "TEXT");
+            try (Statement st = conn.createStatement()) {
+                st.execute("CREATE UNIQUE INDEX IF NOT EXISTS artisans_email_unique ON artisans(email) WHERE email IS NOT NULL");
             }
         } catch (SQLException e) {
             throw new IllegalStateException(e);
@@ -25,17 +30,15 @@ public class Repo implements AutoCloseable {
     }
 
     public void seed() {
-        if (!queryList("SELECT 1 FROM customers LIMIT 1", rs -> 1).isEmpty()) return;
-        int amal = insertCustomer(new Customer(0, "أمل الخطيب", "0791234567", "amal@gmail.com", "Amal@2024", 25, 3));
-        int reem = insertCustomer(new Customer(0, "ريم الشوبكي", "0787654321", "reem@gmail.com", "Reem#2024", 10, 2));
-        int sumayya = insertArtisan(new Artisan(0, "سمية المجالي", "تطريز", 12, 3));
-        int liyan = insertArtisan(new Artisan(0, "ليان الزعبي", "صابون", 9, 2));
-        int mohammad = insertArtisan(new Artisan(0, "محمد العمري", "خشبيات", 5, 1));
-        insertProduct(new Product(0, sumayya, "مفرش كرسي مطرز", "تطريز", 15, 8));
-        insertProduct(new Product(0, sumayya, "كوسطة تطريز فلاحي", "تطريز", 22.5, 4));
-        insertProduct(new Product(0, liyan, "صابون زيت الغار", "صابون", 3.5, 30));
-        insertProduct(new Product(0, liyan, "صابون حبة البركة", "صابون", 4, 0));
-        insertProduct(new Product(0, mohammad, "مجسم خشبي منحوت", "خشبيات", 45, 6));
+        if (!artisans().isEmpty()) return;
+        int samia = insertArtisan(new Artisan(0, "Samia Al-Majali", "Embroidery", 12, 3));
+        int layan = insertArtisan(new Artisan(0, "Layan Al-Zubi", "Soap", 9, 2));
+        int mohammad = insertArtisan(new Artisan(0, "Mohammad Al-Omari", "Woodwork", 5, 1));
+        insertProduct(new Product(0, samia, "Embroidered Chair Cover", "Embroidery", 15, 8));
+        insertProduct(new Product(0, samia, "Fellahi Embroidery Cushion", "Embroidery", 22.5, 4));
+        insertProduct(new Product(0, layan, "Laurel Oil Soap", "Soap", 3.5, 30));
+        insertProduct(new Product(0, layan, "Nigella Seed Soap", "Soap", 4, 0));
+        insertProduct(new Product(0, mohammad, "Carved Wooden Sculpture", "Woodwork", 45, 6));
     }
 
     public int insertCustomer(Customer c) {
@@ -44,8 +47,8 @@ public class Repo implements AutoCloseable {
     }
 
     public int insertArtisan(Artisan a) {
-        return insert("INSERT INTO artisans(name,craft,rating_sum,rating_count) VALUES(?,?,?,?)",
-                a.name, a.craft, a.ratingSum, a.ratingCount);
+        return insert("INSERT INTO artisans(name,craft,email,password,rating_sum,rating_count) VALUES(?,?,?,?,?,?)",
+                a.name, a.craft, a.email, a.password, a.ratingSum, a.ratingCount);
     }
 
     public int insertProduct(Product p) {
@@ -81,7 +84,12 @@ public class Repo implements AutoCloseable {
 
     private static Artisan artisanMapper(ResultSet rs) throws SQLException {
         return new Artisan(rs.getInt("id"), rs.getString("name"), rs.getString("craft"),
+                rs.getString("email"), rs.getString("password"),
                 rs.getDouble("rating_sum"), rs.getInt("rating_count"));
+    }
+
+    public Artisan artisanByEmail(String email) {
+        return queryOne("SELECT * FROM artisans WHERE email=?", Repo::artisanMapper, email);
     }
 
     public void rateArtisan(int artisanId, int stars) {
@@ -143,6 +151,18 @@ public class Repo implements AutoCloseable {
 
 public List<Artisan> artisans() {
         return queryList("SELECT * FROM artisans ORDER BY id", Repo::artisanMapper);
+    }
+
+    private void addColumnIfMissing(String table, String column, String type) throws SQLException {
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) return;
+            }
+        }
+        try (Statement st = conn.createStatement()) {
+            st.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + type);
+        }
     }
 
     public List<Order> ordersByCustomer(int customerId) {

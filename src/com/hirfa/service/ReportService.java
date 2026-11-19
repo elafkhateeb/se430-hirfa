@@ -16,7 +16,7 @@ public class ReportService {
     }
 
     public ArtisanReport artisanReport(int artisanId, LocalDateTime from, LocalDateTime to) {
-        if (from.isAfter(to)) return new ArtisanReport(0, 0, 0, "الفترة غير صحيحة");
+        if (from.isAfter(to)) return new ArtisanReport(0, 0, 0, "Invalid report period.");
         double revenue = 0;
         int ordersCount = 0;
         int itemsCount = 0;
@@ -32,8 +32,8 @@ public class ReportService {
             }
             if (artisanInOrder) ordersCount++;
         }
-        if (ordersCount == 0) return new ArtisanReport(0, 0, 0, "لا توجد طلبات ضمن الفترة المحددة");
-        String msg = "إيراد " + revenue + " دينار من " + ordersCount + " طلب";
+        if (ordersCount == 0) return new ArtisanReport(0, 0, 0, "No orders were found in the selected period.");
+        String msg = "Revenue: " + revenue + " JOD from " + ordersCount + " orders.";
         return new ArtisanReport(revenue, ordersCount, itemsCount, msg);
     }
 }

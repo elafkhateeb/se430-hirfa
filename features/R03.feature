@@ -1,11 +1,12 @@
-Feature: تسجيل حرفي جديد
+Feature: Artisan registration and account
 
-Scenario: تسجيل حرفي ببيانات صحيحة
-Given الحرفي أدخل الاسم "نادية القادرية" والهاتف "0793344556" والفئة "جلوديات"
-When طلب التسجيل كحرفي
-Then يحفظ النظام الحرفي ويظهر "تم تسجيل نادية القادرية كحرفي في فئة جلوديات"
+Scenario: Register a complete artisan account
+  Given an artisan enters valid contact details and selects "Leather"
+  When the artisan registration form is submitted
+  Then an artisan account is created
+  And the artisan is signed in to the product dashboard
 
-Scenario: تسجيل بفئة غير معتمدة
-Given الفئة "طباعة" ليست ضمن الفئات المعتمدة
-When طلب التسجيل
-Then يرفض النظام ويظهر "الفئة غير معتمدة: تطريز، صابون، خشبيات، جلوديات، سيراميك، مجوهرات"
+Scenario: Reject an unapproved craft
+  Given "Printing" is not an approved craft
+  When an artisan submits that craft
+  Then the account is not created

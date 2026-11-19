@@ -14,8 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class WebServer {
     private final Repo repo;
@@ -24,15 +23,18 @@ public class WebServer {
     private final ProductService productService;
     private final CartService cartService;
     private final OrderService orderService;
+    private final OrderLifecycleService orderLifecycleService;
     private final WalletService walletService;
     private final ReportService reportService;
     private final EtaCalculator eta = new EtaCalculator();
 
-    private final Map<String, Session> sessions = new LinkedHashMap<>();
+    private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private static final String COOKIE = "hirfa_sid";
+    private HttpServer server;
 
     private static class Session {
         Customer user;
+        Artisan artisan;
         Cart cart = new Cart();
     }
 
@@ -43,15 +45,28 @@ public class WebServer {
         this.productService = new ProductService(repo);
         this.cartService = new CartService(repo);
         this.orderService = new OrderService(repo);
+        this.orderLifecycleService = new OrderLifecycleService();
         this.walletService = new WalletService(repo);
         this.reportService = new ReportService(repo);
     }
 
     public void start(int port) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+        server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/", this::route);
         server.start();
-        System.out.println("Hirfa platform started: http://localhost:" + port);
+        System.out.println("Hirfa platform started: http://localhost:" + server.getAddress().getPort());
+    }
+
+    public int port() {
+        if (server == null) throw new IllegalStateException("Server has not been started.");
+        return server.getAddress().getPort();
+    }
+
+    public void close() {
+        if (server != null) {
+            server.stop(0);
+            server = null;
+        }
     }
 
     private void route(com.sun.net.httpserver.HttpExchange ex) throws IOException {
@@ -71,23 +86,31 @@ public class WebServer {
         }
 
         String page;
-        switch (path) {
-            case "/", "/products" -> page = products(params.get("craft"), params.get("max"), s);
-            case "/artisan" -> page = post ? doRateArtisan(params.get("id"), params.get("stars"), s)
-                    : artisanPage(params.get("id"), s);
-            case "/register" -> page = post ? doRegister(params, s) : registerPage(null, s);
-            case "/login" -> page = post ? doLogin(params, s) : loginPage(null, s);
-            case "/cart" -> page = post ? cartServiceSubmit(params, s) : cartPage(null, s);
-            case "/order" -> page = post ? doOrder(params, s) : checkoutPage(null, s);
-            case "/wallet" -> page = post ? doWallet(params, s) : walletPage(null, s);
-            case "/orders" -> page = ordersPage(s);
-            case "/admin" -> page = adminPage(params.get("id"), params.get("from"), params.get("to"), s);
-            default -> page = notFound(s);
+        int status = 200;
+        try {
+            switch (path) {
+                case "/", "/products" -> page = products(params.get("craft"), params.get("max"), s);
+                case "/artisan" -> page = post ? doRateArtisan(params.get("id"), params.get("stars"), s)
+                        : artisanPage(params.get("id"), s);
+                case "/artisan/dashboard" -> page = post ? artisanDashboardSubmit(params, s) : artisanDashboard(s);
+                case "/register" -> page = post ? doRegister(params, s) : registerPage(null, s);
+                case "/login" -> page = post ? doLogin(params, s) : loginPage(null, s);
+                case "/cart" -> page = post ? cartServiceSubmit(params, s) : cartPage(null, s);
+                case "/order" -> page = post ? doOrder(params, s) : checkoutPage(null, s);
+                case "/wallet" -> page = post ? doWallet(params, s) : walletPage(null, s);
+                case "/orders" -> page = post ? cancelOrder(params, s) : ordersPage(s);
+                case "/admin" -> page = adminPage(params.get("id"), params.get("from"), params.get("to"), s);
+                default -> page = notFound(s);
+            }
+        } catch (NumberFormatException e) {
+            page = header("Invalid request", "", s)
+                    + note("Enter valid numeric values and try again.", false) + footer();
+            status = 400;
         }
         byte[] bytes = page.getBytes(StandardCharsets.UTF_8);
         if (!sid.equals(cookieOld)) ex.getResponseHeaders().add("Set-Cookie", COOKIE + "=" + sid + "; Path=/; HttpOnly");
         ex.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
-        ex.sendResponseHeaders(200, bytes.length);
+        ex.sendResponseHeaders(status, bytes.length);
         try (OutputStream os = ex.getResponseBody()) {
             os.write(bytes);
         }
@@ -112,139 +135,32 @@ public class WebServer {
         return "";
     }
 
-    /* ---------- bilingual display layer (UI is 100% English) ---------- */
-
-    private static final List<String> CRAFTS = List.of("تطريز", "صابون", "خشبيات", "جلوديات", "سيراميك", "مجوهرات");
-    private static final Map<String, String> CRAFT_EN = Map.of(
-            "تطريز", "Embroidery", "صابون", "Soap", "خشبيات", "Woodwork",
-            "جلوديات", "Leather", "سيراميك", "Ceramics", "مجوهرات", "Jewelry");
-    private static final Map<String, String> NAME_EN = Map.ofEntries(
-            Map.entry("أمل الخطيب", "Amal Al-Khatib"), Map.entry("ريم الشوبكي", "Reem Al-Shobaki"),
-            Map.entry("سمية المجالي", "Samia Al-Majali"), Map.entry("ليان الزعبي", "Layan Al-Zubi"),
-            Map.entry("محمد العمري", "Mohammad Al-Omari"));
-    private static final Map<String, String> PRODUCT_EN = Map.ofEntries(
-            Map.entry("مفرش كرسي مطرز", "Embroidered Chair Cover"),
-            Map.entry("كوسطة تطريز فلاحي", "Fellahi Embroidery Cushion"),
-            Map.entry("صابون زيت الغار", "Laurel Oil Soap"),
-            Map.entry("صابون حبة البركة", "Nigella Seed Soap"),
-            Map.entry("مجسم خشبي منحوت", "Carved Wooden Sculpture"));
-    private static final Map<String, String> MSG_EN = Map.ofEntries(
-            Map.entry("السلة فارغة", "Your cart is empty."),
-            Map.entry("البريد الإلكتروني مسجل مسبقاً", "This email is already registered."),
-            Map.entry("البريد الإلكتروني غير مسجل", "Email is not registered."),
-            Map.entry("البريد الإلكتروني غير صحيح", "Please enter a valid email address."),
-            Map.entry("كلمة المرور غير صحيحة", "Incorrect password."),
-            Map.entry("كلمة المرور ضعيفة", "Weak password: use 8+ characters with letters and numbers."),
-            Map.entry("الاسم مطلوب", "Name is required."),
-            Map.entry("رقم الهاتف غير صحيح، مثال: 0791234567", "Invalid phone number, e.g. 0791234567."),
-            Map.entry("الفئة غير معتمدة: تطريز، صابون، خشبيات، جلوديات، سيراميك، مجوهرات", "Craft not allowed — pick one from the list."),
-            Map.entry("المنتج غير موجود", "Product not found."),
-            Map.entry("الكمية غير صحيحة", "Quantity is invalid."),
-            Map.entry("الكمية المطلوبة غير متوفرة حالياً", "Requested quantity is out of stock."),
-            Map.entry("الحد الأقصى 5 قطع من كل منتج في السلة", "You can add up to 5 pieces per product."),
-            Map.entry("الحد الأدنى لقيمة الطلب 5 دنانير", "Orders start from 5 JOD."),
-            Map.entry("أحد المنتجات في السلة لم يعد متوفراً", "An item in the cart is out of stock."),
-            Map.entry("طريقة الدفع غير معتمدة", "Unsupported payment method."),
-            Map.entry("الكود حرفة10 متاح للطلبات من 10 دنانير", "HIRFA10 applies to orders of 10 JOD or more."),
-            Map.entry("الرصيد في المحفظة غير كافٍ", "Wallet balance is not enough for this order."),
-            Map.entry("أقصى قيمة شحن هي 1000 دينار", "Maximum top-up is 1000 JOD."),
-            Map.entry("أقل قيمة شحن هي دينار واحد", "Minimum top-up is 1 JOD."),
-            Map.entry("قيمة الطلب تتجاوز حد الدفع النقدي (500 دينار)", "Cash on delivery supports orders up to 500 JOD."),
-            Map.entry("رقم البطاقة غير صحيح (16 رقماً)", "Card number must be exactly 16 digits."),
-            Map.entry("التقييم يجب أن يكون بين 1 و 5", "Rating must be between 1 and 5."),
-            Map.entry("الحرفي غير موجود", "Artisan not found."),
-            Map.entry("الفترة غير صحيحة", "Invalid period — from must be before to."),
-            Map.entry("لا توجد طلبات ضمن الفترة المحددة", "No orders in the selected period."),
-            Map.entry("الدفع نقداً عند التسليم", "Cash on delivery accepted."),
-            Map.entry("تم تأكيد الدفع بالبطاقة", "Card payment confirmed."),
-            Map.entry("تم الدفع من المحفظة", "Paid from wallet."));
+    private static final List<String> CRAFTS = List.of("Embroidery", "Soap", "Woodwork", "Leather", "Ceramics", "Jewelry");
 
     private String craftEN(String craft) {
-        return craft == null ? "" : CRAFT_EN.getOrDefault(craft, craft);
+        return craft == null ? "" : craft;
     }
 
     private String nameEN(String name) {
-        return name == null ? "" : NAME_EN.getOrDefault(name, name);
+        return name == null ? "" : name;
     }
 
     private String productEN(String name) {
-        return name == null ? "" : PRODUCT_EN.getOrDefault(name, name);
+        return name == null ? "" : name;
     }
 
     private String craftValue(String label) {
-        for (String c : CRAFTS) if (CRAFT_EN.get(c).equalsIgnoreCase(label)) return c;
-        return label;
+        if (label == null) return "";
+        return CRAFTS.stream().filter(craft -> craft.equalsIgnoreCase(label.trim()))
+                .findFirst().orElse(label.trim());
     }
 
     private String promoValue(String input) {
-        if (input == null) return "";
-        return switch (input.trim().toUpperCase()) {
-            case "HIRFA10", "HIRFA 10" -> "حرفة10";
-            case "STUDENTS5", "STUDENTS 5" -> "طلاب5";
-            default -> input.trim();
-        };
+        return input == null ? "" : input.trim().replace(" ", "").toUpperCase();
     }
 
-    private String t(String m) {
-        if (m == null || m.isBlank()) return "";
-        String exact = MSG_EN.get(m);
-        if (exact != null) return exact;
-        if (m.startsWith("مرحباً بك مجدداً")) {
-            String name = m.replace("مرحباً بك مجدداً", "").replace("،", "").trim();
-            return "Welcome back, " + nameEN(name) + "!";
-        }
-        if (m.contains("تم إنشاء حسابك بنجاح")) {
-            String name = m.replaceFirst("^مرحباً ?", "").replaceFirst("،.*$", "").trim();
-            return "Welcome, " + nameEN(name) + "! Your account has been created.";
-        }
-        if (m.startsWith("مرحباً")) {
-            String name = m.replaceFirst("^مرحباً ", "").replaceFirst("،.*$", "").trim();
-            return "Welcome, " + nameEN(name) + "!";
-        }
-        if (m.startsWith("تمت إضافة ")) return "Added " + anyEN(m.replaceFirst("^تمت إضافة ", "").replaceFirst(" إلى السلة$", "")) + " to your cart.";
-        if (m.startsWith("تم إنشاء الطلب رقم ")) {
-            Matcher x = Pattern.compile("رقم (\\d+) بقيمة ([\\d.]+)").matcher(m);
-            return anyEN(x.find() ? "Order #" + x.group(1) + " created — total " + x.group(2) + " JOD." : "Order created.");
-        }
-        if (m.startsWith("تم تسجيل ")) return "Registered " + nameEN(m.replaceFirst("^تم تسجيل ", "")) + " as an artisan.";
-        if (m.startsWith("تم شحن المحفظة")) {
-            Matcher x = Pattern.compile("([\\d.]+)").matcher(m);
-            return x.find() ? "Wallet topped up — balance " + x.group(1) + " JOD." : "Wallet topped up.";
-        }
-        if (m.startsWith("تم إلغاء الطلب واسترداد ")) {
-            Matcher x = Pattern.compile("([\\d.]+)").matcher(m);
-            return x.find() ? "Order cancelled — " + x.group(1) + " JOD refunded to your wallet." : "Order cancelled with refund.";
-        }
-        if (m.startsWith("تم إلغاء الطلب")) return "Order cancelled.";
-        if (m.startsWith("شكراً لتقييمك")) {
-            Matcher x = Pattern.compile("([\\d.]+)").matcher(m);
-            return x.find() ? "Thanks for rating! Average is now " + x.group(1) + "." : "Thanks for rating!";
-        }
-        if (m.startsWith("إيراد ")) {
-            Matcher x = Pattern.compile("إيراد ([\\d.]+) دينار من (\\d+) طلب").matcher(m);
-            return x.find() ? "Revenue " + x.group(1) + " JOD from " + x.group(2) + " orders." : anyEN(m);
-        }
-        if (m.startsWith("أصبحت حالة الطلب: ")) {
-            String st = m.replaceFirst("^أصبحت حالة الطلب: ", "").replaceFirst(".$", "");
-            return "Order status: " + st.replace("تم التسليم", "Delivered")
-                    .replace("قيد التحضير", "Preparing").replace("قيد التوصيل", "Out for delivery") + ".";
-        }
-        if (m.startsWith("الكود ")) {
-            String code = m.substring("الكود ".length()).replaceFirst(" غير معتمد$", "");
-            return "Promo code \"" + anyEN(code) + "\" is not valid.";
-        }
-        return anyEN(m.startsWith("تم") ? "Success." : "Invalid input.");
-    }
-
-    private String anyEN(String x) {
-        if (x == null) return "";
-        String out = x;
-        for (var e : PRODUCT_EN.entrySet()) out = out.replace(e.getKey(), e.getValue());
-        for (var e : NAME_EN.entrySet()) out = out.replace(e.getKey(), e.getValue());
-        for (var e : CRAFT_EN.entrySet()) out = out.replace(e.getKey(), e.getValue());
-        out = out.replace("دينار", "JOD").replace("دنانير", "JOD")
-                .replace("حرفة10", "HIRFA10").replace("طلاب5", "STUDENTS5");
-        return out;
+    private String t(String message) {
+        return message == null ? "" : message;
     }
 
     /* ---------- pages ---------- */
@@ -300,11 +216,14 @@ public class WebServer {
             """;
 
     private String header(String title, String path, Session s) {
-        boolean in = s.user != null;
+        boolean customer = s.user != null;
+        boolean artisan = s.artisan != null;
         String[][] links;
-        if (in) links = new String[][]{{"Products", "/products"}, {"Cart", "/cart"}, {"Checkout", "/order"},
-                {"Wallet", "/wallet"}, {"My Orders", "/orders"}, {"Reports", "/admin"}};
-        else links = new String[][]{{"Products", "/products"}, {"Cart", "/cart"},
+        if (customer) links = new String[][]{{"Products", "/products"}, {"Cart", "/cart"}, {"Checkout", "/order"},
+                {"Wallet", "/wallet"}, {"My Orders", "/orders"}, {"Artisans", "/artisan"}};
+        else if (artisan) links = new String[][]{{"Products", "/products"},
+                {"Artisan dashboard", "/artisan/dashboard"}, {"My profile", "/artisan?id=" + s.artisan.id}};
+        else links = new String[][]{{"Products", "/products"}, {"Cart", "/cart"}, {"Artisans", "/artisan"},
                 {"Register", "/register"}, {"Login", "/login"}};
         StringBuilder nav = new StringBuilder();
         for (String[] l : links) {
@@ -312,8 +231,12 @@ public class WebServer {
             nav.append("<a href='").append(l[1]).append("'").append(active ? " class='active'" : "").append(">")
                     .append(l[0]).append("</a>");
         }
-        String who = in
-                ? "<span class='chip'>" + nameEN(s.user.name) + " · " + String.format("%.2f JOD", repo.customer(s.user.id).wallet) + "</span>"
+        String who = customer
+                ? "<span class='chip'>" + escapeHtml(nameEN(s.user.name)) + " · "
+                + String.format("%.2f JOD", repo.customer(s.user.id).wallet) + "</span>"
+                + "<a class='btn' href='/logout'>Log out</a>"
+                : artisan
+                ? "<span class='chip'>" + escapeHtml(nameEN(s.artisan.name)) + " · Artisan</span>"
                 + "<a class='btn' href='/logout'>Log out</a>"
                 : "";
         return ("<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>"
@@ -330,7 +253,13 @@ public class WebServer {
     }
 
     private String note(String enMessage, boolean ok) {
-        return "<p class='" + (ok ? "ok" : "err") + "'>" + enMessage + "</p>";
+        return "<p class='" + (ok ? "ok" : "err") + "'>" + escapeHtml(enMessage) + "</p>";
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) return "";
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&#39;");
     }
 
     /* products */
@@ -344,7 +273,7 @@ public class WebServer {
         sb.append("<p class='sub'>Handmade work from Jordanian artisans</p>");
         StringBuilder opts = new StringBuilder("<option value=''>All crafts</option>");
         for (String c : CRAFTS) {
-            String label = CRAFT_EN.get(c);
+            String label = c;
             boolean chosen = label.equalsIgnoreCase(craftParam);
             opts.append("<option value='").append(label).append("'").append(chosen ? " selected" : "").append(">")
                     .append(label).append("</option>");
@@ -355,26 +284,28 @@ public class WebServer {
                 <div><label>Max price (JOD)</label><input name='max' value='%s' size='6'></div>
                 <button>Search</button> <a class='btn' href='/products'>Show all</a>
                 </form></div>
-                """.formatted(opts, max == null ? "" : max));
+                """.formatted(opts, escapeHtml(max == null ? "" : max)));
         if (list.isEmpty()) {
             sb.append("<div class='card center'>No products match your search.</div>");
         } else {
             sb.append("<div class='grid'>");
             for (Product p : list) {
-                String artisanName = nameEN(repo.artisan(p.artisanId).name);
+                Artisan artisan = repo.artisan(p.artisanId);
+                String artisanName = artisan == null ? "Artisan" : nameEN(artisan.name);
                 String stock = p.stock <= 0 ? "<span class='stock out'>Out of stock</span>"
                         : "<span class='stock'>" + p.stock + " in stock</span>";
                 sb.append("""
                         <div class='card product'>
                         <h3>%s</h3>
-                        <span class='tag'>%s</span> <span class='muted'>by %s</span>
+                        <span class='tag'>%s</span> <a class='muted' href='/artisan?id=%d'>by %s</a>
                         <div><span class='price'>%.2f JOD</span> — %s</div>
                         <form method='post' action='/cart' class='buy'>
                         <input type='hidden' name='productId' value='%d'>
                         <label style='margin:0'>Qty</label><input name='qty' value='1'>
                         <button %s>Add to cart</button>
                         </form></div>
-                        """.formatted(productEN(p.name), craftEN(p.craft), artisanName, p.price, stock,
+                        """.formatted(escapeHtml(productEN(p.name)), escapeHtml(craftEN(p.craft)),
+                        p.artisanId, escapeHtml(artisanName), p.price, stock,
                         p.id, p.stock <= 0 ? "disabled" : ""));
             }
             sb.append("</div>");
@@ -391,17 +322,18 @@ public class WebServer {
             sb.append("<p class='sub'>Choose an artisan to see profile, products and rating</p><div class='card row'>");
             for (Artisan a : repo.artisans())
                 sb.append("<a class='btn' href='/artisan?id=%d'>%s (%s)</a>"
-                        .formatted(a.id, nameEN(a.name), craftEN(a.craft)));
+                        .formatted(a.id, escapeHtml(nameEN(a.name)), escapeHtml(craftEN(a.craft))));
             sb.append("</div>");
             return sb.toString() + footer();
         }
         int aid = Integer.parseInt(idParam);
         Artisan a = repo.artisan(aid);
         if (a == null) {
-            sb.append(note(t("الحرفي غير موجود"), false));
+            sb.append(note("Artisan not found.", false));
             return sb.toString() + footer();
         }
-        sb.append("<p class='sub'>").append(nameEN(a.name)).append(" — ").append(craftEN(a.craft)).append("</p>");
+        sb.append("<p class='sub'>").append(escapeHtml(nameEN(a.name))).append(" — ")
+                .append(escapeHtml(craftEN(a.craft))).append("</p>");
         sb.append("""
                 <div class='card row'>
                 <div><div class='balance'>%.1f <small style='font-size:.9rem;color:#8a7a63'>/ 5</small></div>
@@ -433,7 +365,7 @@ public class WebServer {
                     <h3>%s</h3><span class='tag'>%s</span>
                     <div><span class='price'>%.2f JOD</span> — <span class='stock'>%d in stock</span></div>
                     </div>
-                    """.formatted(productEN(p.name), craftEN(p.craft), p.price, p.stock));
+                    """.formatted(escapeHtml(productEN(p.name)), escapeHtml(craftEN(p.craft)), p.price, p.stock));
         }
         if (!any) sb.append("<div class='muted'>No products yet.</div>");
         sb.append("</div>");
@@ -441,8 +373,16 @@ public class WebServer {
     }
 
     private String doRateArtisan(String idParam, String starsParam, Session s) {
-        int aid = Integer.parseInt(idParam);
-        Outcome o = artisanService.rateArtisan(aid, Integer.parseInt(starsParam));
+        if (s.user == null) return loginPage("Log in with a customer account to rate artisans.", s);
+        int aid;
+        int stars;
+        try {
+            aid = Integer.parseInt(idParam);
+            stars = Integer.parseInt(starsParam);
+        } catch (NumberFormatException e) {
+            return notFound(s);
+        }
+        Outcome o = artisanService.rateArtisan(aid, stars);
         StringBuilder sb = new StringBuilder();
         sb.append(header("Artisan profile", "", s));
         sb.append(note(t(o.message()), o.ok()));
@@ -454,13 +394,14 @@ public class WebServer {
     /* register / login / logout */
 
     private String registerPage(String enMessage, Session s) {
+        if (s.user != null || s.artisan != null) return signedInPage(s);
         StringBuilder sb = new StringBuilder();
         sb.append(header("Register", "/register", s));
         if (enMessage != null && !enMessage.isBlank())
             sb.append(note(enMessage, enMessage.startsWith("Welcome")));
         StringBuilder craftOpts = new StringBuilder();
         for (String c : CRAFTS)
-            craftOpts.append("<option value='").append(CRAFT_EN.get(c)).append("'>").append(CRAFT_EN.get(c)).append("</option>");
+            craftOpts.append("<option value='").append(c).append("'>").append(c).append("</option>");
         sb.append("""
                 <div class='card'>
                 <h3 style='margin:0 0 12px;font-size:1.05rem'>Customer account</h3>
@@ -478,8 +419,10 @@ public class WebServer {
                 <input type='hidden' name='role' value='artisan'>
                 <div><label>Name</label><input name='name' required></div>
                 <div><label>Phone</label><input name='phone' required></div>
+                <div><label>Email</label><input name='email' type='email' required></div>
+                <div><label>Password (8+, letters and numbers)</label><input name='password' type='password' required></div>
                 <div><label>Craft</label><select name='craft'>%s</select></div>
-                <button>Register artisan</button>
+                <button>Create artisan account</button>
                 </form></div>
                 """.formatted(craftOpts));
         return sb.toString() + footer();
@@ -487,24 +430,31 @@ public class WebServer {
 
     private String doRegister(LinkedHashMap<String, String> params, Session s) {
         String role = params.getOrDefault("role", "customer");
+        if (!role.equals("customer") && !role.equals("artisan"))
+            return registerPage("Choose a valid account type.", s);
         Outcome o = role.equals("artisan")
-                ? artisanService.register(params.get("name"), params.get("phone"), craftValue(params.get("craft")))
+                ? artisanService.register(params.get("name"), params.get("phone"), craftValue(params.get("craft")),
+                        params.get("email"), params.get("password"))
                 : customerService.register(params.get("name"), params.get("phone"), params.get("email"), params.get("password"));
         if (o.ok() && role.equals("customer")) {
+            s.artisan = null;
             s.user = repo.customer((int) o.value());
             return header("Register", "/register", s) + note(t(o.message()), true)
                     + "<div class='row'><a class='btn' href='/products'>Start shopping</a>"
                     + "<a class='btn' href='/cart'>Cart</a></div>" + footer();
         }
         if (o.ok()) {
-            return header("Register", "/register", s) + note(t(o.message()), true)
-                    + "<div class='row'><a class='btn' href='/login'>Login</a>"
-                    + "<a class='btn' href='/admin'>Reports</a></div>" + footer();
+            s.user = null;
+            s.artisan = repo.artisan((int) o.value());
+            return header("Register", "/register", s) + note(o.message(), true)
+                    + "<div class='row'><a class='btn' href='/artisan/dashboard'>Manage products</a>"
+                    + "<a class='btn' href='/products'>View storefront</a></div>" + footer();
         }
         return registerPage(t(o.message()), s);
     }
 
     private String loginPage(String enMessage, Session s) {
+        if (s.user != null || s.artisan != null) return signedInPage(s);
         StringBuilder sb = new StringBuilder();
         sb.append(header("Login", "/login", s));
         if (enMessage != null && !enMessage.isBlank()) sb.append(note(enMessage, false));
@@ -513,18 +463,40 @@ public class WebServer {
                 <form method='post' action='/login'>
                 <label>Email</label><input name='email' type='email' required style='width:100%%;margin-bottom:10px'>
                 <label>Password</label><input name='password' type='password' required style='width:100%%;margin-bottom:14px'>
+                <label>Account type</label><select name='role' style='width:100%%;margin-bottom:14px'>
+                <option value='customer'>Customer</option><option value='artisan'>Artisan</option></select>
                 <button style='width:100%%'>Login</button>
                 </form>
                 <p style='margin-top:12px;font-size:.9rem;color:#8a7a63'>No account? <a href='/register'>Register</a></p>
-                <div class='hint'>Demo member: amal@gmail.com / Amal@2024</div>
                 </div>
                 """);
         return sb.toString() + footer();
     }
 
+    private String signedInPage(Session s) {
+        String destination = s.artisan == null ? "/products" : "/artisan/dashboard";
+        String label = s.artisan == null ? "Continue shopping" : "Open artisan dashboard";
+        return header("Account", "", s) + note("You are already signed in.", true)
+                + "<a class='btn' href='" + destination + "'>" + label + "</a>" + footer();
+    }
+
     private String doLogin(LinkedHashMap<String, String> params, Session s) {
+        String role = params.getOrDefault("role", "customer");
+        if (!role.equals("customer") && !role.equals("artisan"))
+            return loginPage("Choose a valid account type.", s);
+        if ("artisan".equals(params.get("role"))) {
+            Outcome artisanLogin = artisanService.login(params.get("email"), params.get("password"));
+            if (artisanLogin.ok()) {
+                s.user = null;
+                s.artisan = repo.artisan((int) artisanLogin.value());
+                return header("Login", "/login", s) + note(artisanLogin.message(), true)
+                        + "<div class='row'><a class='btn' href='/artisan/dashboard'>Manage products</a></div>" + footer();
+            }
+            return loginPage(artisanLogin.message(), s);
+        }
         Outcome o = customerService.login(params.get("email"), params.get("password"));
         if (o.ok()) {
+            s.artisan = null;
             s.user = repo.customer((int) o.value());
             return header("Login", "/login", s) + note(t(o.message()), true)
                     + "<div class='row'><a class='btn' href='/products'>Products</a>"
@@ -533,10 +505,78 @@ public class WebServer {
         return loginPage(t(o.message()), s);
     }
 
+    private String artisanDashboard(Session s) {
+        if (s.artisan == null) return loginPage("Log in with an artisan account to manage your products.", s);
+        StringBuilder sb = new StringBuilder(header("Artisan dashboard", "/artisan/dashboard", s));
+        sb.append("<p class='sub'>Manage your ").append(escapeHtml(craftEN(s.artisan.craft)))
+                .append(" products and stock.</p>");
+        sb.append("""
+                <div class='card'><h3>Add a product</h3>
+                <form method='post' action='/artisan/dashboard' class='row'>
+                <input type='hidden' name='action' value='add'>
+                <div><label>Product name</label><input name='name' required></div>
+                <div><label>Price (JOD)</label><input name='price' type='number' min='0.01' max='1000' step='0.01' required></div>
+                <div><label>Initial stock</label><input name='stock' type='number' min='0' max='500' required></div>
+                <button>Add product</button></form></div>
+                """);
+        sb.append("<div class='grid'>");
+        for (Product p : productService.search(s.artisan.craft, null)) {
+            if (p.artisanId != s.artisan.id) continue;
+            sb.append("""
+                    <div class='card product'><h3>%s</h3><span class='price'>%.2f JOD</span>
+                    <span class='stock'>%d in stock</span>
+                    <form method='post' action='/artisan/dashboard' class='row'>
+                    <input type='hidden' name='action' value='restock'>
+                    <input type='hidden' name='productId' value='%d'>
+                    <div><label>Restock quantity</label><input name='qty' type='number' min='1' max='500' required></div>
+                    <button>Restock</button></form></div>
+                    """.formatted(escapeHtml(productEN(p.name)), p.price, p.stock, p.id));
+        }
+        sb.append("</div>");
+        return sb.toString() + footer();
+    }
+
+    private String artisanDashboardSubmit(LinkedHashMap<String, String> params, Session s) {
+        if (s.artisan == null) return loginPage("Log in with an artisan account to manage your products.", s);
+        Outcome result;
+        if ("add".equals(params.get("action"))) {
+            try {
+                result = productService.add(s.artisan.id, params.get("name"), s.artisan.craft,
+                        Double.parseDouble(params.get("price")), Integer.parseInt(params.get("stock")));
+            } catch (NumberFormatException e) {
+                return artisanDashboardMessage("Enter a valid product price and stock quantity.", false, s);
+            }
+        } else if ("restock".equals(params.get("action"))) {
+            try {
+                int productId = Integer.parseInt(params.get("productId"));
+                Product product = repo.product(productId);
+                if (product == null || product.artisanId != s.artisan.id)
+                    return artisanDashboardMessage("Product not found in your account.", false, s);
+                result = productService.restock(productId, Integer.parseInt(params.get("qty")));
+            } catch (NumberFormatException e) {
+                return artisanDashboardMessage("Enter a valid restock quantity.", false, s);
+            }
+        } else {
+            return artisanDashboardMessage("Choose a valid product action.", false, s);
+        }
+        return artisanDashboardMessage(result.message(), result.ok(), s);
+    }
+
+    private String artisanDashboardMessage(String message, boolean ok, Session s) {
+        return header("Artisan dashboard", "/artisan/dashboard", s) + note(t(message), ok)
+                + "<a class='btn' href='/artisan/dashboard'>Back to dashboard</a>" + footer();
+    }
+
     /* cart + checkout */
 
     private String cartServiceSubmit(LinkedHashMap<String, String> params, Session s) {
-        Outcome o = cartService.addItem(s.cart, Integer.parseInt(params.get("productId")), Integer.parseInt(params.get("qty")));
+        int productId = Integer.parseInt(params.get("productId"));
+        Outcome o = switch (params.getOrDefault("action", "add")) {
+            case "add" -> cartService.addItem(s.cart, productId, Integer.parseInt(params.get("qty")));
+            case "update" -> cartService.changeQty(s.cart, productId, Integer.parseInt(params.get("qty")));
+            case "remove" -> cartService.removeItem(s.cart, productId);
+            default -> Outcome.fail("Choose a valid cart action.");
+        };
         return cartPage(o.message(), s);
     }
 
@@ -545,21 +585,32 @@ public class WebServer {
         sb.append(header("Cart", "/cart", s));
         sb.append("<p class='sub'>Review your items before checkout</p>");
         if (rawMessage != null && !rawMessage.isBlank())
-            sb.append(note(t(rawMessage), rawMessage.startsWith("تمت")));
+            sb.append(note(t(rawMessage), rawMessage.startsWith("Added ")));
         var items = s.cart.all();
         if (items.isEmpty()) {
             sb.append("<div class='card center'>Your cart is empty — <a href='/products'>browse products</a>.</div>");
         } else {
             sb.append("""
                     <div class='card table-wrap'><table>
-                    <thead><tr><th>Product</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead><tbody>
+                    <thead><tr><th>Product</th><th>Qty</th><th>Unit price</th><th>Total</th><th>Actions</th></tr></thead><tbody>
                     """);
             for (var e : items.entrySet()) {
                 Product p = repo.product(e.getKey());
-                sb.append("<tr><td>%s</td><td>%d</td><td>%.2f JOD</td><td>%.2f JOD</td></tr>"
-                        .formatted(productEN(p.name), e.getValue(), p.price, p.price * e.getValue()));
+                sb.append("""
+                        <tr><td>%s</td><td>%d</td><td>%.2f JOD</td><td>%.2f JOD</td><td>
+                        <form method='post' action='/cart' class='row'>
+                        <input type='hidden' name='productId' value='%d'>
+                        <input type='hidden' name='action' value='update'>
+                        <input type='number' name='qty' value='%d' min='1' max='5' aria-label='Quantity'>
+                        <button>Update</button></form>
+                        <form method='post' action='/cart'>
+                        <input type='hidden' name='productId' value='%d'>
+                        <input type='hidden' name='action' value='remove'>
+                        <button>Remove</button></form></td></tr>
+                        """.formatted(escapeHtml(productEN(p.name)), e.getValue(), p.price,
+                        p.price * e.getValue(), p.id, e.getValue(), p.id));
             }
-            sb.append("</tbody><tfoot><tr class='total'><td colspan='3'>Cart total</td><td>%.2f JOD</td></tr></tfoot></table></div>"
+            sb.append("</tbody><tfoot><tr class='total'><td colspan='3'>Cart total</td><td>%.2f JOD</td><td></td></tr></tfoot></table></div>"
                     .formatted(cartService.total(s.cart)));
         }
         sb.append("<div class='row' style='margin-top:14px'>");
@@ -573,7 +624,7 @@ public class WebServer {
         if (s.user == null) return checkoutPage("Please log in before checking out.", s);
         double km = Double.parseDouble(params.getOrDefault("km", "7"));
         Outcome o = orderService.place(s.user, s.cart, km, params.get("payment"),
-                promoValue(params.getOrDefault("promo", "")), LocalDateTime.now());
+                promoValue(params.getOrDefault("promo", "")), params.get("card"), LocalDateTime.now());
         if (o.ok()) {
             s.cart.clear();
             return checkoutPage(t(o.message()) + " Estimated arrival: " + eta.estimate(km, 0) + " minutes.", s);
@@ -597,7 +648,7 @@ public class WebServer {
         for (var e : items.entrySet()) {
             Product p = repo.product(e.getKey());
             sb.append("<tr><td>%s</td><td>%d</td><td>%.2f JOD</td></tr>"
-                    .formatted(productEN(p.name), e.getValue(), p.price * e.getValue()));
+                    .formatted(escapeHtml(productEN(p.name)), e.getValue(), p.price * e.getValue()));
         }
         sb.append("<tr class='total'><td colspan='2'>Cart total</td><td>%.2f JOD</td></tr></table></div>"
                 .formatted(cartService.total(s.cart)));
@@ -622,7 +673,7 @@ public class WebServer {
     /* wallet */
 
     private String doWallet(LinkedHashMap<String, String> params, Session s) {
-        if (s.user == null) return walletPage("سجل الدخول أولاً لاستخدام المحفظة", s);
+        if (s.user == null) return walletPage("Log in to use your wallet.", s);
         Outcome o = walletService.topUp(s.user, Double.parseDouble(params.getOrDefault("amount", "0")));
         return walletPage(o.message(), s);
     }
@@ -631,7 +682,7 @@ public class WebServer {
         StringBuilder sb = new StringBuilder();
         sb.append(header("Wallet", "/wallet", s));
         if (rawMessage != null && !rawMessage.isBlank())
-            sb.append(note(t(rawMessage), rawMessage.startsWith("تم شحن")));
+            sb.append(note(t(rawMessage), rawMessage.startsWith("Wallet topped up.")));
         if (s.user == null) {
             sb.append("<div class='card center'><a href='/login'>Login</a> to use the wallet.</div>");
             return sb.toString() + footer();
@@ -650,8 +701,13 @@ public class WebServer {
     /* my orders */
 
     private String ordersPage(Session s) {
+        return ordersPage(s, null, false);
+    }
+
+    private String ordersPage(Session s, String message, boolean success) {
         StringBuilder sb = new StringBuilder();
         sb.append(header("My orders", "/orders", s));
+        if (message != null && !message.isBlank()) sb.append(note(message, success));
         if (s.user == null) {
             sb.append("<div class='card center'>Log in to see your orders — <a href='/login'>Login</a>.</div>");
             return sb.toString() + footer();
@@ -663,14 +719,43 @@ public class WebServer {
         }
         sb.append("""
                 <div class='card table-wrap'><table>
-                <thead><tr><th>Order</th><th>Date</th><th>Payment</th><th>Status</th><th>Total</th></tr></thead><tbody>
+                <thead><tr><th>Order</th><th>Date</th><th>Payment</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead><tbody>
                 """);
         for (Order o : list) {
-            sb.append("<tr><td>#%d</td><td>%s</td><td>%s</td><td><span class='tag'>%s</span></td><td>%.2f JOD</td></tr>"
-                    .formatted(o.id, o.createdAt.toLocalDate(), o.payment, statusEN(o.status), o.total));
+            sb.append("<tr><td>#%d</td><td>%s</td><td>%s</td><td><span class='tag'>%s</span></td><td>%.2f JOD</td><td>%s</td></tr>"
+                    .formatted(o.id, o.createdAt.toLocalDate(), o.payment, statusEN(o.status), o.total,
+                            o.status == Order.Status.NEW
+                                    ? "<form method='post' action='/orders'><input type='hidden' name='orderId' value='"
+                                    + o.id + "'><button>Cancel order</button></form>" : ""));
         }
         sb.append("</tbody></table></div>");
         return sb.toString() + footer();
+    }
+
+    private String cancelOrder(LinkedHashMap<String, String> params, Session s) {
+        if (s.user == null) return loginPage("Log in with a customer account to cancel an order.", s);
+        int orderId = Integer.parseInt(params.get("orderId"));
+        Order order = repo.order(orderId);
+        if (order == null || order.customerId != s.user.id)
+            return ordersPage(s, "Order not found in your account.", false);
+        Outcome result = orderLifecycleService.cancel(order, LocalDateTime.now());
+        if (result.ok()) {
+            for (OrderItem item : order.items) {
+                Product product = repo.product(item.productId());
+                if (product != null) {
+                    product.stock += item.qty();
+                    repo.saveProduct(product);
+                }
+            }
+            if ("WALLET".equals(order.payment)) {
+                Customer customer = repo.customer(s.user.id);
+                customer.wallet = Math.round((customer.wallet + order.total) * 100.0) / 100.0;
+                repo.saveCustomer(customer);
+                s.user = customer;
+            }
+            repo.updateStatus(order.id, order.status);
+        }
+        return ordersPage(s, result.message(), result.ok());
     }
 
     private String statusEN(Order.Status st) {
@@ -693,7 +778,7 @@ public class WebServer {
         for (Artisan a : repo.artisans()) {
             String chosen = (idParam != null && ("" + a.id).equals(idParam)) || (idParam == null && a.id == 1) ? " selected" : "";
             opts.append("<option value='").append(a.id).append("'").append(chosen).append(">")
-                    .append(nameEN(a.name)).append("</option>");
+                    .append(escapeHtml(nameEN(a.name))).append("</option>");
         }
         sb.append("""
                 <div class='card'><form method='get' action='/admin' class='row'>
@@ -702,8 +787,9 @@ public class WebServer {
                 <div><label>To</label><input name='to' type='date' value='%s'></div>
                 <button>Run report</button>
                 </form></div>
-                """.formatted(opts, from == null ? LocalDateTime.now().toLocalDate() : from,
-                to == null ? LocalDateTime.now().toLocalDate() : to));
+                """.formatted(opts,
+                escapeHtml(String.valueOf(from == null ? LocalDateTime.now().toLocalDate() : from)),
+                escapeHtml(String.valueOf(to == null ? LocalDateTime.now().toLocalDate() : to))));
         if (idParam != null && from != null && to != null) {
             int aid = Integer.parseInt(idParam);
             Artisan a = repo.artisan(aid);
@@ -713,7 +799,8 @@ public class WebServer {
                 sb.append("""
                         <div class='card'><h3 style='margin:0 0 8px'>%s <span class='tag'>%s</span></h3>
                         <p style='margin:0'><b>%s</b></p></div>
-                        """.formatted(nameEN(a.name), craftEN(a.craft), t(r.message())));
+                        """.formatted(escapeHtml(nameEN(a.name)), escapeHtml(craftEN(a.craft)),
+                        escapeHtml(t(r.message()))));
             } else {
                 sb.append(note("Artisan not found.", false));
             }

@@ -15,19 +15,20 @@ public class CustomerService {
     }
 
     public Outcome register(String name, String phone, String email, String password) {
-        if (!validation.validName(name)) return Outcome.fail("الاسم مطلوب");
-        if (!validation.validPhone(phone)) return Outcome.fail("رقم الهاتف غير صحيح، مثال: 0791234567");
-        if (!validation.validEmail(email)) return Outcome.fail("البريد الإلكتروني غير صحيح");
-        if (!validation.validPassword(password)) return Outcome.fail("كلمة المرور ضعيفة: 8 خانات على الأقل مع أحرف وأرقام");
-        if (repo.customerByEmail(email) != null) return Outcome.fail("البريد الإلكتروني مسجل مسبقاً");
-        int id = repo.insertCustomer(new Customer(0, name.trim(), phone, email, password, 0, 0));
-        return new Outcome(true, "مرحباً " + name.trim() + "، تم إنشاء حسابك بنجاح", id);
+        if (!validation.validName(name)) return Outcome.fail("Enter a valid name using English letters.");
+        if (!validation.validPhone(phone)) return Outcome.fail("Enter a valid Jordanian mobile number.");
+        if (!validation.validEmail(email)) return Outcome.fail("Enter a valid email address.");
+        if (!validation.validPassword(password)) return Outcome.fail("Password must contain at least 8 characters, letters, and numbers.");
+        String normalizedEmail = email.trim().toLowerCase();
+        if (repo.customerByEmail(normalizedEmail) != null) return Outcome.fail("This email is already registered.");
+        int id = repo.insertCustomer(new Customer(0, name.trim(), phone, normalizedEmail, password, 0, 0));
+        return new Outcome(true, "Welcome, " + name.trim() + "! Your account has been created.", id);
     }
 
     public Outcome login(String email, String password) {
-        Customer c = repo.customerByEmail(email);
-        if (c == null) return Outcome.fail("البريد الإلكتروني غير مسجل");
-        if (!c.password.equals(password)) return Outcome.fail("كلمة المرور غير صحيحة");
-        return Outcome.ok("مرحباً بك مجدداً، " + c.name, c.id);
+        Customer c = email == null ? null : repo.customerByEmail(email.trim().toLowerCase());
+        if (c == null) return Outcome.fail("Email is not registered.");
+        if (!c.password.equals(password)) return Outcome.fail("Incorrect password.");
+        return Outcome.ok("Welcome back, " + c.name + ".", c.id);
     }
 }

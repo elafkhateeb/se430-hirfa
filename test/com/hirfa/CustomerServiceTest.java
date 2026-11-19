@@ -19,86 +19,87 @@ public class CustomerServiceTest {
         Repo repo = new Repo(":memory:");
         repo.seed();
         service = new CustomerService(repo);
+        service.register("Amal Al-Khatib", "0791234567", "customer@example.com", "CustomerPass2026");
     }
 
     @Test
     void register_validData_createsAccount() {
-        Outcome out = service.register("تالا حداد", "0771112223", "tala@gmail.com", "Tala@2024");
+        Outcome out = service.register("Tala Haddad", "0771112223", "tala@example.com", "TalaPass2026");
         assertTrue(out.ok());
-        assertTrue(out.message().contains("تم إنشاء حسابك بنجاح"));
+        assertTrue(out.message().contains("account has been created"));
     }
 
     @Test
     void register_duplicateEmail_rejected() {
-        Outcome out = service.register("أمل الخطيب", "0791234567", "amal@gmail.com", "Amal@2024");
+        Outcome out = service.register("Amal Al-Khatib", "0791234567", "customer@example.com", "CustomerPass2026");
         assertFalse(out.ok());
-        assertTrue(out.message().contains("مسجل مسبقاً"));
+        assertTrue(out.message().contains("already registered"));
     }
 
     @Test
     void register_missingName_rejected() {
-        assertFalse(service.register("  ", "0771112223", "tala@gmail.com", "Tala@2024").ok());
+        assertFalse(service.register("  ", "0771112223", "tala@example.com", "TalaPass2026").ok());
     }
 
     @Test
     void register_nullName_rejected() {
-        assertFalse(service.register(null, "0771112223", "tala@gmail.com", "Tala@2024").ok());
+        assertFalse(service.register(null, "0771112223", "tala@example.com", "TalaPass2026").ok());
     }
 
     @Test
     void register_nullPhone_rejected() {
-        assertFalse(service.register("تالا حداد", null, "tala@gmail.com", "Tala@2024").ok());
+        assertFalse(service.register("Tala Haddad", null, "tala@example.com", "TalaPass2026").ok());
     }
 
     @Test
     void register_nullEmail_rejected() {
-        assertFalse(service.register("تالا حداد", "0771112223", null, "Tala@2024").ok());
+        assertFalse(service.register("Tala Haddad", "0771112223", null, "TalaPass2026").ok());
     }
 
     @Test
     void register_nullPassword_rejected() {
-        assertFalse(service.register("تالا حداد", "0771112223", "tala@gmail.com", null).ok());
+        assertFalse(service.register("Tala Haddad", "0771112223", "tala@example.com", null).ok());
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"0712345678", "079123456", "07912345678", "0691234567", ""})
     void register_badPhone_rejected(String phone) {
-        assertFalse(service.register("تالا حداد", phone, "tala@gmail.com", "Tala@2024").ok());
+        assertFalse(service.register("Tala Haddad", phone, "tala@example.com", "TalaPass2026").ok());
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"tala@gmail", "tala#mail.com", "tala@com", "@gmail.com", ""})
     void register_badEmail_rejected(String email) {
-        assertFalse(service.register("تالا حداد", "0771112223", email, "Tala@2024").ok());
+        assertFalse(service.register("Tala Haddad", "0771112223", email, "TalaPass2026").ok());
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"T@2", "12345678", "abcdefgh", ""})
     void register_weakPassword_rejected(String password) {
-        assertFalse(service.register("تالا حداد", "0771112223", "tala@gmail.com", password).ok());
+        assertFalse(service.register("Tala Haddad", "0771112223", "tala@example.com", password).ok());
     }
 
     @Test
     void login_correctCredentials_welcome() {
-        Outcome out = service.login("amal@gmail.com", "Amal@2024");
+        Outcome out = service.login("customer@example.com", "CustomerPass2026");
         assertAll(
                 () -> assertTrue(out.ok()),
-                () -> assertTrue(out.message().contains("مرحباً")),
-                () -> assertTrue(out.message().contains("أمل الخطيب"))
+                () -> assertTrue(out.message().contains("Welcome back")),
+                () -> assertTrue(out.message().contains("Amal Al-Khatib"))
         );
     }
 
     @Test
     void login_unknownEmail_rejected() {
-        Outcome out = service.login("nadia@gmail.com", "Amal@2024");
+        Outcome out = service.login("nadia@example.com", "CustomerPass2026");
         assertFalse(out.ok());
-        assertTrue(out.message().contains("غير مسجل"));
+        assertTrue(out.message().contains("not registered"));
     }
 
     @Test
     void login_wrongPassword_rejected() {
-        Outcome out = service.login("amal@gmail.com", "Wrong@123");
+        Outcome out = service.login("customer@example.com", "WrongPass2026");
         assertFalse(out.ok());
-        assertTrue(out.message().contains("غير صحيحة"));
+        assertTrue(out.message().contains("Incorrect password"));
     }
 }

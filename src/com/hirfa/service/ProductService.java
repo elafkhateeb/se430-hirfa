@@ -17,24 +17,27 @@ public class ProductService {
     }
 
     public Outcome add(int artisanId, String name, String craft, double price, int stock) {
-        if (!validation.validName(name)) return Outcome.fail("اسم المنتج مطلوب");
-        if (!validation.validCraft(craft)) return Outcome.fail("الفئة غير معتمدة");
-        if (price <= 0) return Outcome.fail("السعر يجب أن يكون أكبر من صفر");
-        if (price > MAX_PRICE) return Outcome.fail("السعر يتجاوز الحد الأقصى 1000 دينار");
-        if (stock < 0) return Outcome.fail("المخزون لا يمكن أن يكون سالباً");
-        if (stock > MAX_STOCK) return Outcome.fail("المخزون يتجاوز الحد الأقصى 500 قطعة");
+        var artisan = repo.artisan(artisanId);
+        if (artisan == null) return Outcome.fail("Artisan not found.");
+        if (!validation.validName(name)) return Outcome.fail("Enter a product name using English letters.");
+        if (!validation.validCraft(craft)) return Outcome.fail("Choose a supported craft.");
+        if (!artisan.craft.equals(craft)) return Outcome.fail("Products must use the artisan's registered craft.");
+        if (!Double.isFinite(price) || price <= 0) return Outcome.fail("Price must be greater than 0 JOD.");
+        if (price > MAX_PRICE) return Outcome.fail("Price cannot exceed 1000 JOD.");
+        if (stock < 0) return Outcome.fail("Stock cannot be negative.");
+        if (stock > MAX_STOCK) return Outcome.fail("Stock cannot exceed 500 items.");
         int id = repo.insertProduct(new Product(0, artisanId, name.trim(), craft, price, stock));
-        return new Outcome(true, "تم إضافة المنتج " + name.trim() + " بسعر " + price + " دينار", id);
+        return new Outcome(true, "Product " + name.trim() + " added at " + price + " JOD.", id);
     }
 
     public Outcome restock(int productId, int amount) {
         Product p = repo.product(productId);
-        if (p == null) return Outcome.fail("المنتج غير موجود");
-        if (amount <= 0) return Outcome.fail("الكمية غير صحيحة");
-        if (p.stock + amount > MAX_STOCK) return Outcome.fail("المخزون يتجاوز الحد الأقصى 500 قطعة");
+        if (p == null) return Outcome.fail("Product not found.");
+        if (amount <= 0) return Outcome.fail("Restock quantity must be positive.");
+        if ((long) p.stock + amount > MAX_STOCK) return Outcome.fail("Stock cannot exceed 500 items.");
         p.stock += amount;
         repo.saveProduct(p);
-        return new Outcome(true, "تم إعادة التخزين، الكمية الحالية " + p.stock, p.stock);
+        return new Outcome(true, "Stock updated to " + p.stock + ".", p.stock);
     }
 
     public List<Product> search(String craft, Double maxPrice) {
